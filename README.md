@@ -638,156 +638,214 @@ Add drawing buttons to HTML:
 
 ---
 
-## 🚀 Part 3: Advanced Challenge - Enterprise Feature
+## 🚀 Part 3: Advanced Challenge - Build ONE Feature
 
-**Goal:** Build one advanced enterprise feature that demonstrates professional web GIS capabilities.
+**Goal:** Apply what you learned by building ONE focused feature (not everything!).
 
-### Requirements:
-
-Choose **ONE** of these enterprise features to implement:
-
-### Option A: Multi-Projection Parcel Viewer (5 pts)
-
-Build a parcel/survey application with projection transformations:
-
-- **Load data in State Plane or UTM** (non-Web Mercator)
-- **Coordinate display** in multiple projections (State Plane, Lat/Lon, UTM)
-- **Measurement tools** that work in local coordinate system
-- **Export capabilities** in original projection
-- **Projection switcher** showing same data in different coordinate systems
-- **Professional UI** for surveyors/assessors
-
-**Why this matters:** County assessors, surveyors, and engineers work exclusively in local coordinate systems. This demonstrates you can build real-world GIS applications.
-
-### Option B: Advanced Measurement Tools (5 pts)
-
-Build a professional measurement system:
-
-- **Length measurement** with distance calculation
-- **Area measurement** with acreage/hectares
-- **Bearing/azimuth** for directional analysis
-- **Coordinate display** on mouse move
-- **Unit conversion** (meters/feet, km/miles)
-- **Measurement persistence** (save/load measurements)
-
-### Option B: Advanced Measurement Tools (5 pts)
-
-Build a professional measurement system:
-
-- **Length measurement** with distance calculation
-- **Area measurement** with acreage/hectares
-- **Bearing/azimuth** for directional analysis
-- **Coordinate display** on mouse move (multiple projections)
-- **Unit conversion** (meters/feet, km/miles, acres/hectares)
-- **Measurement persistence** (save/load measurements)
-
-### Option C: Feature Editing System (5 pts)
-
-Build collaborative editing capabilities:
-
-- **Feature selection** with modify interaction
-- **Attribute editing** with form interface
-- **Geometry editing** (move, reshape, delete)
-- **Validation rules** preventing invalid geometries
-- **Undo/redo** functionality
-- **Export edited features** to GeoJSON
-
-### Option C: Feature Editing System (5 pts)
-
-Build collaborative editing capabilities:
-
-- **Feature selection** with modify interaction
-- **Attribute editing** with form interface
-- **Geometry editing** (move, reshape, delete)
-- **Validation rules** preventing invalid geometries
-- **Undo/redo** functionality
-- **Export edited features** to GeoJSON (in original projection if applicable)
-
-### Option D: Compass/Gyro Navigation Interface (5 pts)
-
-Build a rotation-based navigation system:
-
-- **Device orientation integration** (compass/gyroscope)
-- **Smooth rotation animations** maintaining north
-- **Bearing indicator** showing current heading
-- **Rotation lock/unlock** toggle
-- **True north indicator** overlay
-- **Mobile-optimized controls** for field use
-
-**Use case:** Field data collection app where map orientation matches device orientation for better spatial awareness.
-
-### Files to Create:
-- `src/part3/index.html` - Your implementation
-- `src/part3/js/main.js` - Your code
-- `src/part3/css/styles.css` - Custom styling
-- `src/part3/README.md` - **REQUIRED**: Document your feature
+**⏰ Estimated time:** 60-90 minutes  
+**💡 Tip:** Pick the option that interests you most - they're all equally valid!
 
 ---
 
-### Documentation Required:
+### Choose **ONE** Option:
 
-Create `src/part3/README.md`:
+---
+
+### **Option A: Simple Projection Converter** ⭐ (Easiest)
+
+Build a tool that converts coordinates between different projections.
+
+**Minimum Requirements (choose 3 of 5):**
+- [ ] Input box for lat/lon coordinates
+- [ ] Display same point in Web Mercator (EPSG:3857)
+- [ ] Display same point in State Plane (EPSG:2227)
+- [ ] Add marker at the converted location
+- [ ] Copy-to-clipboard button for coordinates
+
+**Starter Code Provided:**
+
+```javascript
+// Already set up proj4 in Part 2!
+// Just add input handling:
+
+function convertCoordinates() {
+    const lat = parseFloat(document.getElementById('lat').value);
+    const lon = parseFloat(document.getElementById('lon').value);
+    
+    // Convert to different projections
+    const wgs84 = [lon, lat];
+    const webMerc = ol.proj.transform(wgs84, 'EPSG:4326', 'EPSG:3857');
+    const statePlane = ol.proj.transform(wgs84, 'EPSG:4326', 'EPSG:2227');
+    
+    // Display results
+    document.getElementById('result-wgs84').textContent = `${lon}, ${lat}`;
+    document.getElementById('result-webmerc').textContent = `${webMerc[0].toFixed(2)}, ${webMerc[1].toFixed(2)}`;
+    document.getElementById('result-stateplane').textContent = `${statePlane[0].toFixed(2)}, ${statePlane[1].toFixed(2)}`;
+    
+    // Add marker
+    // ... (copy from Part 1)
+}
+```
+
+**What to submit:**
+- HTML with input form
+- JavaScript with conversion logic
+- Screenshot showing 3 different coordinate systems
+
+---
+
+### **Option B: Rotation Control with Compass** 🧭 (Medium)
+
+Extend Part 2's rotation to include compass-style navigation.
+
+**Minimum Requirements (choose 3 of 5):**
+- [ ] Rotation slider (you already did this in Part 2!)
+- [ ] Compass rose graphic that rotates with map
+- [ ] "North" button to reset to 0°
+- [ ] Display current bearing in degrees
+- [ ] Keyboard controls (arrow keys to rotate)
+
+**Starter Code Provided:**
+
+```html
+<!-- Add compass rose -->
+<div id="compass" style="position: absolute; top: 20px; right: 20px; 
+     width: 100px; height: 100px; background: white; border-radius: 50%; 
+     border: 3px solid #333; display: flex; align-items: center; justify-content: center;">
+    <div id="compass-needle" style="width: 2px; height: 40px; background: red; 
+         transform-origin: center bottom; transition: transform 0.3s;">
+    </div>
+</div>
+```
+
+```javascript
+// Update compass when map rotates
+map.getView().on('change:rotation', function() {
+    const rotation = map.getView().getRotation();
+    const degrees = (rotation * 180 / Math.PI).toFixed(1);
+    document.getElementById('compass-needle').style.transform = `rotate(${-degrees}deg)`;
+});
+```
+
+**What to submit:**
+- Working rotation control
+- Visual compass indicator
+- Documentation with screenshots
+
+---
+
+### **Option C: Simple Measurement Tool** 📏 (Medium)
+
+Build a tool that measures distances or areas.
+
+**Minimum Requirements (choose 2 of 4):**
+- [ ] Draw a line and show length in meters
+- [ ] Draw a polygon and show area in square meters
+- [ ] Clear/delete measurement button
+- [ ] Display results in a styled box
+
+**Starter Code Provided:**
+
+OpenLayers has a [complete measurement example](https://openlayers.org/en/latest/examples/measure.html)!
+
+You can:
+1. Copy the example code
+2. Simplify it (remove features you don't need)
+3. Add your own styling
+4. Document how it works
+
+**What to submit:**
+- Working measurement tool (line OR polygon)
+- Results display
+- Clear button
+- Short explanation of how it works
+
+---
+
+### **Option D: Layer Opacity Slider** 🎨 (Easiest)
+
+Add opacity controls to your layers.
+
+**Minimum Requirements (choose 3 of 4):**
+- [ ] Slider for base map opacity
+- [ ] Slider for WMS layer opacity
+- [ ] Visual feedback (opacity changes live)
+- [ ] Reset to 100% button
+
+**Starter Code Provided:**
+
+```html
+<div style="position: absolute; bottom: 20px; right: 20px; background: white; padding: 15px; border-radius: 5px;">
+    <h4>Layer Opacity</h4>
+    
+    <label>Base Map: <span id="osm-opacity">100</span>%</label>
+    <input type="range" id="osm-slider" min="0" max="100" value="100">
+    
+    <label>WMS Layer: <span id="wms-opacity">100</span>%</label>
+    <input type="range" id="wms-slider" min="0" max="100" value="100">
+</div>
+```
+
+```javascript
+document.getElementById('osm-slider').addEventListener('input', function(e) {
+    const opacity = e.target.value / 100;
+    osmLayer.setOpacity(opacity);
+    document.getElementById('osm-opacity').textContent = e.target.value;
+});
+
+// Repeat for WMS layer
+```
+
+**What to submit:**
+- Working opacity sliders
+- Visual demonstration (before/after screenshots)
+
+---
+
+## 📝 Simplified Submission Requirements
+
+**Instead of complex documentation, just submit:**
+
+1. **Working code** in `src/part3/`
+2. **Short README** answering these 3 questions:
+   - What feature did you build?
+   - How does it work? (2-3 sentences)
+   - What OpenLayers APIs did you use?
+
+**Example README.md:**
 
 ```markdown
-# Part 3: Enterprise Feature - [Feature Name]
+# Part 3: Simple Projection Converter
 
-## Overview
-[Brief description of the feature and why you chose it]
+## What I Built
+A coordinate converter that shows the same point in 3 different projections: WGS84, Web Mercator, and California State Plane.
 
-## Features Implemented
+## How It Works
+User enters lat/lon coordinates, and JavaScript uses `ol.proj.transform()` to convert them to different coordinate systems. A marker is added to show the location on the map.
 
-### Core Functionality
-- [ ] Feature 1 description
-- [ ] Feature 2 description
-- [ ] Feature 3 description
-
-### UI/UX
-- [ ] Professional interface
-- [ ] User feedback (messages, loading indicators)
-- [ ] Responsive design
-
-### Technical Implementation
-- [ ] OpenLayers interactions used
-- [ ] Data management approach
-- [ ] Error handling
-
-## Usage Instructions
-
-1. [Step-by-step guide for users]
-2. [...]
-
-## Technical Notes
-
-### Key OpenLayers APIs Used:
-- `ol.interaction.Draw` - [explanation]
-- `ol.geom.Polygon.getArea()` - [explanation]
-- ...
-
-### Challenges Encountered:
-[Any interesting problems you solved]
-
-### Future Enhancements:
-[What you would add with more time]
+## OpenLayers APIs Used
+- `ol.proj.transform()` - Convert between projections
+- `ol.Feature` + `ol.geom.Point` - Create marker
+- `ol.source.Vector` - Add marker to map
 ```
 
 ---
 
 ### ✅ Part 3 Completion Checklist:
 
-- [ ] Advanced feature fully implemented
-- [ ] Professional UI with clear controls
-- [ ] Error handling for edge cases
-- [ ] Code is well-commented
-- [ ] README.md documents the feature
+- [ ] ONE option completed (not all of them!)
 - [ ] Feature works without errors
+- [ ] Short README explains what you did
+- [ ] Code is commented
 
-**Submit:** Commit your `src/part3/` directory with all files and documentation
+**Submit:** Commit your `src/part3/` directory
 
 **Grading (5 points):**
-- Core functionality (2 pts)
-- UI/UX quality (1 pt)
+- Feature works (3 pts)
 - Code quality (1 pt)
 - Documentation (1 pt)
+
+**Remember:** You only need to do ONE option, and you only need the minimum requirements! 🎯
 
 ---
 
