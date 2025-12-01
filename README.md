@@ -11,8 +11,8 @@ This assignment has **three progressive parts** that build your OpenLayers skill
 | Part | Focus | Points |
 |------|-------|--------|
 | **Part 1: Simple Tutorial** | Build from scratch - HTML basics to interactive OpenLayers map | 5 pts |
-| **Part 2: Walkthrough Tutorial** | Vector tiles, WMS layers, and advanced controls | 5 pts |
-| **Part 3: Advanced Challenge** | Build an enterprise feature (drawing tools, measurement, or editing) | 5 pts |
+| **Part 2: Walkthrough Tutorial** | Projections, map rotation, WMS layers, and drawing tools | 5 pts |
+| **Part 3: Advanced Challenge** | Build an enterprise feature (projection work, measurement, or editing) | 5 pts |
 
 **Total: 15 points**
 
@@ -110,13 +110,32 @@ Before closing `</body>` tag, add:
 </script>
 ```
 
-**Understanding Projections:**
+**Understanding Projections: OpenLayers' Superpower** 🌐
 
-OpenLayers uses **EPSG:3857** (Web Mercator) internally for display, but coordinates are often in **EPSG:4326** (latitude/longitude).
+**This is a KEY advantage OpenLayers has over Leaflet!**
 
+OpenLayers has robust support for **any projection**, while Leaflet is essentially locked to Web Mercator (EPSG:3857). This matters enormously for:
+
+- **Surveying & Engineering:** Working with State Plane Coordinate Systems
+- **Parcel mapping:** Local governments often maintain data in county-specific projections
+- **Legal boundaries:** Property lines are surveyed in local coordinate systems
+- **Scientific applications:** Research data in UTM zones or custom projections
+
+**Common Projections:**
+
+| Code | Name | Use Case | OpenLayers | Leaflet |
+|------|------|----------|------------|---------|
+| **EPSG:4326** | WGS84 (Lat/Lon) | GPS coordinates | ✅ | ✅ |
+| **EPSG:3857** | Web Mercator | Web mapping | ✅ | ✅ |
+| **EPSG:2227** | CA State Plane Zone 3 | California surveys/parcels | ✅ | ❌ |
+| **EPSG:32610** | UTM Zone 10N | Pacific Northwest mapping | ✅ | ❌ |
+
+**In this example:**
 - `ol.proj.fromLonLat([lon, lat])` converts from EPSG:4326 → EPSG:3857
-- **Why?** Web maps use Mercator projection for efficient tiling
-- **Input:** Longitude first, then latitude `[lon, lat]`
+- **Input:** Longitude first, then latitude `[lon, lat]` (opposite of Leaflet!)
+- OpenLayers handles the math automatically
+
+**Real-world example:** If you're building a parcel viewer for a county assessor's office, you NEED OpenLayers because parcel coordinates are in State Plane, not Web Mercator. Leaflet can't handle this without complex workarounds.
 
 **Test:** Open console (F12) - you should see "OpenLayers map created!" but no tiles yet.
 
@@ -265,14 +284,19 @@ map.on('click', function(event) {
 
 ## 🗺️ Part 2: Walkthrough Tutorial - Enterprise Features
 
-**Goal:** Work with real-world data sources including vector tiles, WMS layers, and advanced controls.
+**Goal:** Master OpenLayers' advanced capabilities that set it apart from Leaflet.
+
+**🎯 Why OpenLayers?** This part focuses on features that are difficult or impossible in Leaflet:
+- **Projection transformations** for parcel/survey work
+- **Map rotation** for compass/gyro-based navigation
+- **WMS enterprise services**
 
 ### What You'll Learn:
-- ✅ Loading vector tiles (MVT format)
+- ✅ **Working with custom projections** (State Plane, UTM) for surveys/parcels
+- ✅ **Map rotation** for handheld compass/gyro devices
 - ✅ Connecting to WMS services
 - ✅ Layer management with switcher
-- ✅ Custom styling for vector data
-- ✅ Drawing and measurement tools
+- ✅ Drawing tools
 
 ### Files Provided:
 - `src/part2/index.html` - Starter template
@@ -309,26 +333,64 @@ map.addLayer(osmLayer);
 
 ---
 
-#### **Step 2.2: Add Vector Tile Layer**
+#### **Step 2.2: Working with Custom Projections** 🌐
 
-📖 **Learn more:** [ol/layer/VectorTile](https://openlayers.org/en/latest/apidoc/module-ol_layer_VectorTile-VectorTileLayer.html) | [MVT Format](https://github.com/mapbox/vector-tile-spec)
+📖 **Learn more:** [ol/proj](https://openlayers.org/en/latest/apidoc/module-ol_proj.html) | [Proj4js](http://proj4js.org/) | [EPSG.io](https://epsg.io/)
 
-Add a Mapbox Streets vector tile layer:
+**Why This Matters:** Leaflet cannot do this!
 
-```javascript
-const vectorTileLayer = new ol.layer.VectorTile({
-    source: new ol.source.VectorTile({
-        format: new ol.format.MVT(),
-        url: 'https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.mvt?access_token=YOUR_TOKEN'
-    }),
-    title: 'Vector Streets'
-});
-map.addLayer(vectorTileLayer);
+Real-world GIS data often comes in local coordinate systems:
+- **Parcel data:** County assessors use State Plane
+- **Survey data:** Engineering drawings in State Plane or local grids
+- **Legal boundaries:** Property lines surveyed in local coordinates
+- **Scientific data:** Research data in UTM zones
+
+**Example: Loading State Plane Data**
+
+Add proj4js library to your HTML `<head>`:
+
+```html
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
 ```
 
-**Note:** For this exercise, you can use OpenMapTiles or OpenStreetMap vector tiles instead.
+Then define a custom projection (California State Plane Zone 3):
 
-**Test:** Vector features should render as scalable graphics.
+```javascript
+// Define California State Plane Zone 3 (feet)
+proj4.defs("EPSG:2227", "+proj=lcc +lat_1=38.43333333333333 +lat_2=37.06666666666667 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs");
+ol.proj.proj4.register(proj4);
+
+// Now you can work with State Plane coordinates!
+// Example: Convert a parcel coordinate to Web Mercator for display
+const parcelCoord = [6327426, 2101965];  // In State Plane feet
+const webMercatorCoord = ol.proj.transform(parcelCoord, 'EPSG:2227', 'EPSG:3857');
+
+// Create a marker at the parcel location
+const parcelFeature = new ol.Feature({
+    geometry: new ol.geom.Point(webMercatorCoord),
+    name: 'Parcel APN 123-456-789',
+    statePlaneX: parcelCoord[0],
+    statePlaneY: parcelCoord[1]
+});
+```
+
+**Real-World Use Case:**
+
+Imagine you're building a web map for a county assessor's office. All their parcel data is in State Plane coordinates (EPSG:2227). With OpenLayers, you can:
+
+1. Load parcel GeoJSON in State Plane
+2. Transform to Web Mercator for display
+3. Show coordinates in both systems
+4. Export data back to State Plane for surveyors
+
+**Leaflet can't do this** without complex external libraries and manual coordinate math.
+
+**Test:** Add a `console.log()` to verify transformation works:
+
+```javascript
+console.log('State Plane:', parcelCoord);
+console.log('Web Mercator:', webMercatorCoord);
+```
 
 ---
 
@@ -414,7 +476,100 @@ Add CSS for layer switcher (in `<style>` tag):
 
 ---
 
-#### **Step 2.5: Add Drawing Tools**
+#### **Step 2.5: Add Map Rotation** 🧭
+
+📖 **Learn more:** [ol/View rotation](https://openlayers.org/en/latest/apidoc/module-ol_View-View.html#setRotation)
+
+**Why This Matters:** Leaflet cannot do this!
+
+Map rotation is essential for:
+- **Mobile/handheld devices** with compass or gyroscope sensors
+- **Navigation apps** that maintain true north as device orientation changes
+- **Field data collection** where map orientation matches real-world view
+- **Augmented reality** applications overlaying map data on camera view
+
+**Real-World Use Case:**
+
+Imagine you're building a field data collection app for surveyors or utility workers. As they walk and rotate their device, the map rotates to match their orientation, keeping "up" aligned with the direction they're facing. This dramatically improves spatial awareness in the field.
+
+**Implementation:**
+
+Add rotation control to HTML (after layer switcher):
+
+```html
+<div style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: white; padding: 15px; border-radius: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+    <label for="rotation">Map Rotation: <span id="rotation-value">0</span>°</label><br>
+    <input type="range" id="rotation" min="0" max="360" value="0" style="width: 200px;">
+    <button onclick="resetRotation()">Reset North</button>
+</div>
+```
+
+Add rotation handler to your JavaScript:
+
+```javascript
+// Get rotation slider
+const rotationSlider = document.getElementById('rotation');
+const rotationValue = document.getElementById('rotation-value');
+
+// Handle rotation changes
+rotationSlider.addEventListener('input', function(e) {
+    const degrees = parseInt(e.target.value);
+    const radians = (degrees * Math.PI) / 180;
+    
+    // Rotate the map view
+    map.getView().setRotation(radians);
+    
+    // Update display
+    rotationValue.textContent = degrees;
+});
+
+// Reset to north
+function resetRotation() {
+    map.getView().setRotation(0);
+    rotationSlider.value = 0;
+    rotationValue.textContent = 0;
+}
+
+// Optional: Animate rotation for smooth transitions
+function rotateToNorth() {
+    map.getView().animate({
+        rotation: 0,
+        duration: 1000
+    });
+}
+```
+
+**Advanced: Compass Integration**
+
+For mobile devices with compass/gyro sensors:
+
+```javascript
+// Check if device orientation API is available
+if (window.DeviceOrientationEvent) {
+    window.addEventListener('deviceorientation', function(event) {
+        if (event.webkitCompassHeading !== undefined) {
+            // iOS
+            const heading = event.webkitCompassHeading;
+            const radians = (heading * Math.PI) / 180;
+            map.getView().setRotation(-radians);
+        } else if (event.alpha !== null) {
+            // Android
+            const heading = 360 - event.alpha;
+            const radians = (heading * Math.PI) / 180;
+            map.getView().setRotation(-radians);
+        }
+    });
+}
+```
+
+**Test:** 
+- Move the rotation slider - map should rotate!
+- Click "Reset North" - map should snap back to north-up
+- On mobile, test compass integration (requires HTTPS)
+
+---
+
+#### **Step 2.6: Add Drawing Tools**
 
 📖 **Learn more:** [ol/interaction/Draw](https://openlayers.org/en/latest/apidoc/module-ol_interaction_Draw-Draw.html)
 
@@ -464,7 +619,8 @@ Add drawing buttons to HTML:
 ### ✅ Part 2 Completion Checklist:
 
 - [ ] Map initializes with enterprise configuration
-- [ ] Vector tile layer loads
+- [ ] Custom projection transformation working (State Plane example)
+- [ ] Map rotation control functional
 - [ ] WMS layer loads
 - [ ] Layer switcher controls visibility
 - [ ] Drawing tools work for all geometry types
@@ -474,10 +630,10 @@ Add drawing buttons to HTML:
 **Submit:** Commit your completed `src/part2/` directory
 
 **Grading (5 points):**
-- Vector tiles (1 pt)
+- Custom projections (1 pt)
+- Map rotation (1 pt)
 - WMS integration (1 pt)
-- Layer switcher (1 pt)
-- Drawing tools (1 pt)
+- Layer switcher + drawing (1 pt)
 - Code quality (1 pt)
 
 ---
@@ -490,7 +646,20 @@ Add drawing buttons to HTML:
 
 Choose **ONE** of these enterprise features to implement:
 
-### Option A: Advanced Measurement Tools (5 pts)
+### Option A: Multi-Projection Parcel Viewer (5 pts)
+
+Build a parcel/survey application with projection transformations:
+
+- **Load data in State Plane or UTM** (non-Web Mercator)
+- **Coordinate display** in multiple projections (State Plane, Lat/Lon, UTM)
+- **Measurement tools** that work in local coordinate system
+- **Export capabilities** in original projection
+- **Projection switcher** showing same data in different coordinate systems
+- **Professional UI** for surveyors/assessors
+
+**Why this matters:** County assessors, surveyors, and engineers work exclusively in local coordinate systems. This demonstrates you can build real-world GIS applications.
+
+### Option B: Advanced Measurement Tools (5 pts)
 
 Build a professional measurement system:
 
@@ -501,7 +670,18 @@ Build a professional measurement system:
 - **Unit conversion** (meters/feet, km/miles)
 - **Measurement persistence** (save/load measurements)
 
-### Option B: Feature Editing System (5 pts)
+### Option B: Advanced Measurement Tools (5 pts)
+
+Build a professional measurement system:
+
+- **Length measurement** with distance calculation
+- **Area measurement** with acreage/hectares
+- **Bearing/azimuth** for directional analysis
+- **Coordinate display** on mouse move (multiple projections)
+- **Unit conversion** (meters/feet, km/miles, acres/hectares)
+- **Measurement persistence** (save/load measurements)
+
+### Option C: Feature Editing System (5 pts)
 
 Build collaborative editing capabilities:
 
@@ -512,16 +692,29 @@ Build collaborative editing capabilities:
 - **Undo/redo** functionality
 - **Export edited features** to GeoJSON
 
-### Option C: Spatial Analysis Tools (5 pts)
+### Option C: Feature Editing System (5 pts)
 
-Build analysis capabilities:
+Build collaborative editing capabilities:
 
-- **Buffer generation** with distance parameter
-- **Intersection** of two layers
-- **Union** of features
-- **Spatial query** (features within distance)
-- **Results visualization** with custom styling
-- **Analysis export** to GeoJSON
+- **Feature selection** with modify interaction
+- **Attribute editing** with form interface
+- **Geometry editing** (move, reshape, delete)
+- **Validation rules** preventing invalid geometries
+- **Undo/redo** functionality
+- **Export edited features** to GeoJSON (in original projection if applicable)
+
+### Option D: Compass/Gyro Navigation Interface (5 pts)
+
+Build a rotation-based navigation system:
+
+- **Device orientation integration** (compass/gyroscope)
+- **Smooth rotation animations** maintaining north
+- **Bearing indicator** showing current heading
+- **Rotation lock/unlock** toggle
+- **True north indicator** overlay
+- **Mobile-optimized controls** for field use
+
+**Use case:** Field data collection app where map orientation matches device orientation for better spatial awareness.
 
 ### Files to Create:
 - `src/part3/index.html` - Your implementation
