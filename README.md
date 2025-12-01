@@ -642,7 +642,6 @@ Add drawing buttons to HTML:
 
 **Goal:** Apply what you learned by building ONE focused feature (not everything!).
 
-**⏰ Estimated time:** 60-90 minutes  
 **💡 Tip:** Pick the option that interests you most - they're all equally valid!
 
 ---
