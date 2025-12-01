@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenLayers Enterprise Map - GIST 604B</title>
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
+    
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>🗺️ OpenLayers Enterprise Map</h1>
+        <p>GIST 604B - Module 5 Assignment - Part 2</p>
+    </header>
+    
+    <div class="container">
+        <!-- Drawing tools -->
+        <div class="drawing-tools">
+            <h3>Drawing Tools</h3>
+            <button onclick="addDrawInteraction('Point')">📍 Point</button>
+            <button onclick="addDrawInteraction('LineString')">📏 Line</button>
+            <button onclick="addDrawInteraction('Polygon')">⬟ Polygon</button>
+            <button onclick="clearDrawings()">🗑️ Clear</button>
+        </div>
+        
+        <!-- Map container -->
+        <div id="map"></div>
+        
+        <!-- Info panel -->
+        <div class="info">
+            <h3>Instructions:</h3>
+            <ul>
+                <li>✅ Use layer switcher (top right) to toggle layers</li>
+                <li>✅ Try drawing tools to create features</li>
+                <li>✅ Explore vector tiles vs raster WMS</li>
+                <li>✅ Click features for information (if implemented)</li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Popup for feature info -->
+    <div id="popup" class="ol-popup">
+        <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+        <div id="popup-content"></div>
+    </div>
+    
+    <!-- OpenLayers JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
+    
+    <!-- Your code -->
+    <script src="js/main.js"></script>
+</body>
+</html>
+

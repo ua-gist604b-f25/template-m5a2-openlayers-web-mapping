@@ -1,0 +1,25 @@
+{
+  "name": "gist-604b-openlayers-enterprise-mapping",
+  "version": "1.0.0",
+  "description": "M5A2: OpenLayers Enterprise Web Mapping - 3-part progressive tutorial",
+  "main": "src/part2/index.html",
+  "scripts": {
+    "start": "npx http-server src/part2 -p 8000 -o",
+    "part1": "npx http-server src/part1 -p 8001 -o",
+    "part2": "npx http-server src/part2 -p 8002 -o",
+    "part3": "npx http-server src/part3 -p 8003 -o"
+  },
+  "keywords": [
+    "openlayers",
+    "webgis",
+    "mapping",
+    "gis",
+    "enterprise"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+

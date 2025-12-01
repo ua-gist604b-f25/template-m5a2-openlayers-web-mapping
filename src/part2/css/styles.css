@@ -1,0 +1,195 @@
+/* ============================================
+   GIST 604B - OpenLayers Enterprise Styling
+   ============================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+}
+
+header {
+    background-color: #2c3e50;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+h1 {
+    font-size: 24px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Map styling */
+#map {
+    height: 600px;
+    width: 100%;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    margin: 20px 0;
+}
+
+/* Drawing tools */
+.drawing-tools {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #ecf0f1;
+    border-radius: 5px;
+}
+
+.drawing-tools h3 {
+    margin-right: 15px;
+    line-height: 36px;
+}
+
+.drawing-tools button {
+    padding: 8px 15px;
+    border: none;
+    background: #3498db;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.drawing-tools button:hover {
+    background: #2980b9;
+}
+
+/* Layer switcher */
+.layer-switcher {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    min-width: 200px;
+    z-index: 1000;
+}
+
+.layer-switcher h4 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.layer-switcher label {
+    display: block;
+    padding: 5px 0;
+    cursor: pointer;
+}
+
+.layer-switcher input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Info panel */
+.info {
+    background: white;
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.info h3 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.info ul {
+    margin-left: 20px;
+}
+
+.info li {
+    margin: 5px 0;
+}
+
+/* OpenLayers popup */
+.ol-popup {
+    position: absolute;
+    background-color: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #cccccc;
+    bottom: 12px;
+    left: -50px;
+    min-width: 200px;
+    display: none;
+}
+
+.ol-popup:after, .ol-popup:before {
+    top: 100%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+.ol-popup:after {
+    border-top-color: white;
+    border-width: 10px;
+    left: 48px;
+    margin-left: -10px;
+}
+
+.ol-popup:before {
+    border-top-color: #cccccc;
+    border-width: 11px;
+    left: 48px;
+    margin-left: -11px;
+}
+
+.ol-popup-closer {
+    text-decoration: none;
+    position: absolute;
+    top: 2px;
+    right: 8px;
+}
+
+.ol-popup-closer:after {
+    content: "✖";
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        margin: 10px;
+        padding: 10px;
+    }
+    
+    #map {
+        height: 400px;
+    }
+    
+    .drawing-tools {
+        flex-wrap: wrap;
+    }
+    
+    .layer-switcher {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin-bottom: 10px;
+    }
+}
+
