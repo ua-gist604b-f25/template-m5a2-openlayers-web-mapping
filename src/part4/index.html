@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Part 4: Sentinel-2 COG with Contrast Stretch - Tucson, AZ</title>
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛰️ Part 4: Sentinel-2 Multispectral Imagery</h1>
+            <p class="subtitle">Cloud Optimized GeoTIFF (COG) with Dynamic Contrast Stretch - Tucson, Arizona</p>
+        </header>
+
+        <div class="content">
+            <!-- Map Container -->
+            <div id="map" class="map-container"></div>
+
+            <!-- Controls Panel -->
+            <div class="controls-panel">
+                <h3>🎨 Contrast Stretch Controls</h3>
+                
+                <div class="control-group">
+                    <h4>Band Selection</h4>
+                    <div class="band-selector">
+                        <label>
+                            <input type="radio" name="visualization" value="rgb" checked>
+                            <span>🌈 True Color (RGB)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="visualization" value="nir-red-green">
+                            <span>🌿 False Color (NIR-R-G)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="visualization" value="ndvi">
+                            <span>📊 NDVI (Vegetation Index)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h4>Red Band Contrast</h4>
+                    <div class="slider-control">
+                        <label for="red-min">Min:</label>
+                        <input type="range" id="red-min" min="0" max="10000" value="0" step="100">
+                        <span id="red-min-value">0</span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="red-max">Max:</label>
+                        <input type="range" id="red-max" min="0" max="10000" value="3000" step="100">
+                        <span id="red-max-value">3000</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h4>Green Band Contrast</h4>
+                    <div class="slider-control">
+                        <label for="green-min">Min:</label>
+                        <input type="range" id="green-min" min="0" max="10000" value="0" step="100">
+                        <span id="green-min-value">0</span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="green-max">Max:</label>
+                        <input type="range" id="green-max" min="0" max="10000" value="3000" step="100">
+                        <span id="green-max-value">3000</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h4>NIR Band Contrast</h4>
+                    <div class="slider-control">
+                        <label for="nir-min">Min:</label>
+                        <input type="range" id="nir-min" min="0" max="10000" value="0" step="100">
+                        <span id="nir-min-value">0</span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="nir-max">Max:</label>
+                        <input type="range" id="nir-max" min="0" max="10000" value="4000" step="100">
+                        <span id="nir-max-value">4000</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <button id="reset-button" class="reset-btn">🔄 Reset to Defaults</button>
+                </div>
+
+                <div class="info-panel">
+                    <h4>ℹ️ About This Data</h4>
+                    <ul>
+                        <li><strong>Source:</strong> Sentinel-2 L2A (ESA)</li>
+                        <li><strong>Location:</strong> Tucson, Arizona</li>
+                        <li><strong>Resolution:</strong> 10m (RGB), 10m (NIR)</li>
+                        <li><strong>Format:</strong> Cloud Optimized GeoTIFF</li>
+                        <li><strong>Bands:</strong> Red (B4), Green (B3), Blue (B2), NIR (B8)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="js/main.js"></script>
+</body>
+</html>
+
