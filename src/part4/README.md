@@ -148,7 +148,26 @@ Then open: `http://localhost:8003`
 
 ## 📚 Technical Implementation
 
-### Key OpenLayers Components:
+### CDN vs npm Build Considerations:
+
+**This demo uses OpenLayers via CDN** for simplicity and ease of deployment. However, this has important limitations:
+
+- **Tile Layer (not WebGLTile):** Using `ol.layer.Tile` for reliability with CDN
+- **Limited Contrast Stretch:** Full GPU-accelerated contrast stretching requires `ol.layer.WebGLTile`, which has compatibility issues with the CDN version
+- **TCI Asset:** Using True Color Image (TCI) which is pre-processed RGB (0-255 values)
+- **Pre-rendered Imagery:** The TCI is already processed by ESA and should be immediately visible
+
+**For Production/Advanced Features (use npm):**
+```bash
+npm install ol geotiff
+```
+Then you can:
+- Use `ol.layer.WebGLTile` for GPU-accelerated rendering
+- Implement advanced contrast stretching with band math
+- Load individual bands (R, G, B, NIR) for custom composites
+- Create false-color and NDVI visualizations
+
+### Key OpenLayers Components (npm version):
 
 ```javascript
 // 1. GeoTIFF Source (reads COG)
@@ -157,7 +176,7 @@ const cogSource = new ol.source.GeoTIFF({
     crossOrigin: 'anonymous'
 });
 
-// 2. WebGLTile Layer (GPU-accelerated rendering)
+// 2. WebGLTile Layer (GPU-accelerated rendering) - requires npm build
 const cogLayer = new ol.layer.WebGLTile({
     source: cogSource,
     style: {
@@ -169,6 +188,24 @@ const cogLayer = new ol.layer.WebGLTile({
 // 3. Dynamic Style Update
 cogLayer.setStyle({
     color: ['interpolate', ['linear'], ['band', 1], min, 0, max, 1]
+});
+```
+
+### STAC API Integration:
+
+This demo queries the [Element 84 Earth Search STAC API](https://earth-search.aws.element84.com/v1) to find real Sentinel-2 scenes:
+
+```javascript
+const response = await fetch('https://earth-search.aws.element84.com/v1/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        collections: ['sentinel-2-l2a'],
+        bbox: [-111.1, 32.1, -110.7, 32.4], // Tucson
+        datetime: '2023-01-01T00:00:00Z/2023-12-31T23:59:59Z',
+        limit: 1,
+        sortby: [{ field: 'properties.eo:cloud_cover', direction: 'asc' }]
+    })
 });
 ```
 

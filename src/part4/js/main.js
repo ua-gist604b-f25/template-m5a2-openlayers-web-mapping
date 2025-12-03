@@ -182,25 +182,18 @@ function loadSingleCOG(cogUrl) {
         // Wait for source to be ready
         cogSource.getView().then((viewConfig) => {
             console.log('✅ COG source ready');
-            console.log('📐 Image size:', viewConfig.extent);
+            console.log('📐 Image extent:', viewConfig.extent);
+            console.log('📊 Projection:', viewConfig.projection);
             
-            // Create WebGLTile layer with simple passthrough (no contrast stretch initially)
-            cogLayer = new ol.layer.WebGLTile({
+            // Use DataTile layer instead of WebGLTile (more reliable with CDN)
+            cogLayer = new ol.layer.Tile({
                 source: cogSource,
-                style: {
-                    color: [
-                        'array',
-                        ['/', ['band', 1], 255], // Red (TCI is 0-255)
-                        ['/', ['band', 2], 255], // Green
-                        ['/', ['band', 3], 255], // Blue
-                        1
-                    ]
-                }
+                opacity: 1.0
             });
 
             map.addLayer(cogLayer);
-            console.log('✅ WebGLTile layer added');
-            console.log('💡 Adjust sliders to see contrast stretch effects');
+            console.log('✅ Tile layer added to map');
+            console.log('💡 TCI should be visible now (pre-processed RGB)');
 
             // Zoom to extent
             map.getView().fit(viewConfig.extent, {
@@ -209,9 +202,11 @@ function loadSingleCOG(cogUrl) {
             });
             
             console.log('✅ Sentinel-2 TCI loaded successfully');
+            console.log('ℹ️ Note: Using Tile layer instead of WebGLTile for CDN compatibility');
 
         }).catch((error) => {
             console.error('❌ Error loading TCI:', error);
+            console.error('Details:', error.message, error.stack);
             loadFallbackCOG();
         });
 
@@ -303,7 +298,8 @@ function loadFallbackCOG() {
 
 /**
  * Update contrast stretch based on slider values
- * Note: TCI values are 0-255, sliders are scaled to make sense for user
+ * Note: With regular Tile layer, contrast stretch is limited
+ * (WebGLTile required for advanced contrast control, but has CDN compatibility issues)
  */
 function updateContrastStretch() {
     const redMin = parseInt(document.getElementById('red-min').value);
@@ -319,46 +315,19 @@ function updateContrastStretch() {
     document.getElementById('nir-min-value').textContent = 'N/A';
     document.getElementById('nir-max-value').textContent = 'N/A';
 
-    // Update layer style with new stretch values
+    // With regular Tile layer, we can only adjust opacity
+    // (True contrast stretch requires WebGLTile which has CDN issues)
     if (cogLayer) {
         const vizMode = document.querySelector('input[name="visualization"]:checked').value;
-
-        let color;
-        if (vizMode === 'rgb') {
-            // True Color with adjustable contrast
-            // TCI bands are 0-255
-            // Slider values 0-10000 represent "brightness" multipliers
-            // Convert to reasonable stretch: slider 3000 = normal (1.0x), 6000 = 2x, etc.
-            const redBrightness = redMax / 3000.0;
-            const greenBrightness = greenMax / 3000.0;
-            
-            color = [
-                'array',
-                ['clamp', ['*', ['/', ['band', 1], 255], redBrightness], 0, 1],
-                ['clamp', ['*', ['/', ['band', 2], 255], greenBrightness], 0, 1],
-                ['/', ['band', 3], 255], // Blue - keep normal
-                1
-            ];
-            
-            console.log('🎨 Brightness:', { red: redBrightness.toFixed(2), green: greenBrightness.toFixed(2) });
-        } else {
-            // For other modes, use standard display
-            console.log('⚠️ False Color and NDVI require separate NIR band (not available in TCI)');
-            color = [
-                'array',
-                ['/', ['band', 1], 255],
-                ['/', ['band', 2], 255],
-                ['/', ['band', 3], 255],
-                1
-            ];
-        }
-
-        try {
-            cogLayer.setStyle({ color: color });
-            console.log('🎨 Contrast updated:', { mode: vizMode, red: [redMin, redMax], green: [greenMin, greenMax] });
-        } catch (error) {
-            console.error('❌ Error updating style:', error);
-        }
+        
+        // Calculate opacity based on average brightness setting
+        const avgBrightness = ((redMax + greenMax) / 2) / 3000.0;
+        const opacity = Math.min(1.0, avgBrightness);
+        
+        cogLayer.setOpacity(opacity);
+        
+        console.log('🎨 Adjusted opacity:', opacity.toFixed(2), '(Full contrast stretch requires WebGLTile/npm build)');
+        console.log('ℹ️ TCI is pre-processed RGB - should be visible without stretch');
     }
 }
 
