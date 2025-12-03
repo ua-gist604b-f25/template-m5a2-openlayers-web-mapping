@@ -9,9 +9,9 @@
     "part1": "npx http-server src/part1 -p 8001 -o",
     "part2": "npx http-server src/part2 -p 8002 -o",
     "part3": "npx http-server src/part3 -p 8003 -o",
-    "part4": "vite src/part4 --port 8004 --open",
-    "part4:build": "vite build src/part4",
-    "part4:preview": "vite preview --port 8004 --open"
+    "part4": "vite",
+    "part4:build": "vite build",
+    "part4:preview": "vite preview"
   },
   "keywords": [
     "openlayers",
