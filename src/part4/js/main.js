@@ -184,14 +184,14 @@ function loadSingleCOG(cogUrl) {
             console.log('✅ COG source ready');
             console.log('📐 Image size:', viewConfig.extent);
             
-            // Create WebGLTile layer
+            // Create WebGLTile layer with simple passthrough (no contrast stretch initially)
             cogLayer = new ol.layer.WebGLTile({
                 source: cogSource,
                 style: {
                     color: [
                         'array',
-                        ['/', ['band', 1], 255], // Red
-                        ['/', ['band', 2], 255], // Green  
+                        ['/', ['band', 1], 255], // Red (TCI is 0-255)
+                        ['/', ['band', 2], 255], // Green
                         ['/', ['band', 3], 255], // Blue
                         1
                     ]
@@ -200,6 +200,7 @@ function loadSingleCOG(cogUrl) {
 
             map.addLayer(cogLayer);
             console.log('✅ WebGLTile layer added');
+            console.log('💡 Adjust sliders to see contrast stretch effects');
 
             // Zoom to extent
             map.getView().fit(viewConfig.extent, {
@@ -302,7 +303,7 @@ function loadFallbackCOG() {
 
 /**
  * Update contrast stretch based on slider values
- * Note: With TCI (True Color Image), contrast stretch is simplified
+ * Note: TCI values are 0-255, sliders are scaled to make sense for user
  */
 function updateContrastStretch() {
     const redMin = parseInt(document.getElementById('red-min').value);
@@ -325,17 +326,21 @@ function updateContrastStretch() {
         let color;
         if (vizMode === 'rgb') {
             // True Color with adjustable contrast
-            // TCI bands are 8-bit (0-255), so scale sliders accordingly
-            const redScale = redMax / 10000; // Convert 0-10000 slider to 0-1 scale
-            const greenScale = greenMax / 10000;
+            // TCI bands are 0-255
+            // Slider values 0-10000 represent "brightness" multipliers
+            // Convert to reasonable stretch: slider 3000 = normal (1.0x), 6000 = 2x, etc.
+            const redBrightness = redMax / 3000.0;
+            const greenBrightness = greenMax / 3000.0;
             
             color = [
                 'array',
-                ['clamp', ['*', ['/', ['band', 1], 255], redScale], 0, 1],
-                ['clamp', ['*', ['/', ['band', 2], 255], greenScale], 0, 1],
-                ['/', ['band', 3], 255], // Blue - fixed
+                ['clamp', ['*', ['/', ['band', 1], 255], redBrightness], 0, 1],
+                ['clamp', ['*', ['/', ['band', 2], 255], greenBrightness], 0, 1],
+                ['/', ['band', 3], 255], // Blue - keep normal
                 1
             ];
+            
+            console.log('🎨 Brightness:', { red: redBrightness.toFixed(2), green: greenBrightness.toFixed(2) });
         } else {
             // For other modes, use standard display
             console.log('⚠️ False Color and NDVI require separate NIR band (not available in TCI)');
