@@ -48,14 +48,14 @@ function initializeMap() {
             center: ol.proj.fromLonLat(tucsonCenter),
             zoom: 11,
             projection: 'EPSG:3857'
-        }),
-        controls: ol.control.defaults().extend([
-            new ol.control.ScaleLine({
-                units: 'metric'
-            }),
-            new ol.control.FullScreen()
-        ])
+        })
     });
+
+    // Add additional controls
+    map.addControl(new ol.control.ScaleLine({
+        units: 'metric'
+    }));
+    map.addControl(new ol.control.FullScreen());
 
     console.log('✅ Map initialized');
     
