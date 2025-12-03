@@ -3,7 +3,8 @@
  * GIST 604B - Module 5: Web GIS Full-Stack Orchestration
  * 
  * Demonstrates:
- * - Loading Cloud Optimized GeoTIFF (COG) from public Sentinel-2 data
+ * - Discovering Sentinel-2 COGs via STAC API
+ * - Loading Cloud Optimized GeoTIFF with signed/public URLs
  * - WebGLTile layer for efficient rendering
  * - Dynamic contrast stretching with user controls
  * - Multi-band visualization (RGB, False Color, NDVI)
@@ -59,63 +60,116 @@ function initializeMap() {
 
     console.log('✅ Map initialized');
     
-    // Load Sentinel-2 COG
-    loadSentinelCOG();
+    // Search for Sentinel-2 scene via STAC
+    searchSTACForScene();
 }
 
 /**
- * Load Sentinel-2 Cloud Optimized GeoTIFF
- * Using public Sentinel-2 COG from AWS Open Data (discoverable via STAC)
- * 
- * STAC Search Process:
- * 1. Search STAC catalog: https://earth-search.aws.element84.com/v1
- * 2. Filter by location (Tucson area: -111, 32)
- * 3. Filter by date and cloud cover
- * 4. Extract COG URLs from assets
+ * Search STAC API for Sentinel-2 scene over Tucson
+ * Using Element 84's earth-search STAC catalog
  */
-function loadSentinelCOG() {
-    console.log('🛰️ Loading Sentinel-2 COG...');
-    console.log('📍 Study Area: Tucson, Arizona');
+async function searchSTACForScene() {
+    console.log('🔍 Searching STAC catalog for Sentinel-2 scene...');
+    console.log('📍 Area of Interest: Tucson, Arizona');
 
     try {
-        // Real Sentinel-2 L2A COG from AWS (discovered via STAC)
-        // Scene: S2A_12SUA_20231015_0_L2A (October 15, 2023)
-        // Tile: 12SUA (covers Tucson area)
-        // Source: https://earth-search.aws.element84.com/v1
+        // Element 84 earth-search STAC API
+        const stacUrl = 'https://earth-search.aws.element84.com/v1/search';
         
-        // Individual band COGs for multispectral analysis
-        const bands = {
-            red: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B04.tif',
-            green: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B03.tif',
-            blue: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B02.tif',
-            nir: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B08.tif'
+        // Search parameters
+        const searchParams = {
+            collections: ['sentinel-2-l2a'],
+            bbox: [-111.2, 32.0, -110.7, 32.5], // Tucson area
+            datetime: '2023-01-01T00:00:00Z/2023-12-31T23:59:59Z',
+            limit: 1,
+            query: {
+                'eo:cloud_cover': {
+                    'lt': 10 // Less than 10% cloud cover
+                }
+            },
+            sortby: [
+                {
+                    field: 'properties.datetime',
+                    direction: 'desc'
+                }
+            ]
         };
 
-        console.log('📦 Loading bands:', Object.keys(bands));
-        console.log('🔗 Red band URL:', bands.red);
+        console.log('🌐 Querying:', stacUrl);
+        console.log('📦 Search params:', searchParams);
 
+        const response = await fetch(stacUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(searchParams)
+        });
+
+        if (!response.ok) {
+            throw new Error(`STAC API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.features || data.features.length === 0) {
+            throw new Error('No Sentinel-2 scenes found for Tucson area');
+        }
+
+        const scene = data.features[0];
+        console.log('✅ Found scene:', scene.id);
+        console.log('📅 Date:', scene.properties.datetime);
+        console.log('☁️ Cloud cover:', scene.properties['eo:cloud_cover'], '%');
+        
+        // Extract COG URLs from assets
+        const assets = scene.assets;
+        const cogUrls = {
+            red: assets.red?.href || assets.B04?.href,
+            green: assets.green?.href || assets.B03?.href,
+            blue: assets.blue?.href || assets.B02?.href,
+            nir: assets.nir?.href || assets.B08?.href
+        };
+
+        console.log('🔗 COG URLs discovered:');
+        console.log('  Red:', cogUrls.red);
+        console.log('  Green:', cogUrls.green);
+        console.log('  Blue:', cogUrls.blue);
+        console.log('  NIR:', cogUrls.nir);
+
+        // Verify all URLs exist
+        if (!cogUrls.red || !cogUrls.green || !cogUrls.blue || !cogUrls.nir) {
+            throw new Error('Missing band assets in STAC response');
+        }
+
+        // Load the COGs
+        loadSentinelCOG(cogUrls);
+
+    } catch (error) {
+        console.error('❌ Error searching STAC:', error);
+        console.log('⚠️ Falling back to example COG...');
+        
+        // Fallback to known working example
+        loadFallbackCOG();
+    }
+}
+
+/**
+ * Load Sentinel-2 COG bands
+ */
+function loadSentinelCOG(cogUrls) {
+    console.log('🛰️ Loading Sentinel-2 COG bands...');
+
+    try {
         // Create GeoTIFF source with multiple bands
         cogSource = new ol.source.GeoTIFF({
             sources: [
-                {
-                    url: bands.red,
-                    max: 10000  // Sentinel-2 L2A typical max value
-                },
-                {
-                    url: bands.green,
-                    max: 10000
-                },
-                {
-                    url: bands.blue,
-                    max: 10000
-                },
-                {
-                    url: bands.nir,
-                    max: 10000
-                }
+                { url: cogUrls.red, max: 10000 },
+                { url: cogUrls.green, max: 10000 },
+                { url: cogUrls.blue, max: 10000 },
+                { url: cogUrls.nir, max: 10000 }
             ],
             crossOrigin: 'anonymous',
-            interpolate: false  // Preserve pixel values
+            interpolate: false
         });
 
         // Create WebGLTile layer with contrast stretch
@@ -124,28 +178,11 @@ function loadSentinelCOG() {
             style: {
                 color: [
                     'array',
-                    // Red channel: Band 1 (Red) with linear stretch
-                    ['/', 
-                        ['-', ['band', 1], ['var', 'redMin']], 
-                        ['-', ['var', 'redMax'], ['var', 'redMin']]
-                    ],
-                    // Green channel: Band 2 (Green) with linear stretch
-                    ['/', 
-                        ['-', ['band', 2], ['var', 'greenMin']], 
-                        ['-', ['var', 'greenMax'], ['var', 'greenMin']]
-                    ],
-                    // Blue channel: Band 3 (Blue) - fixed range for simplicity
-                    ['/', ['band', 3], 10000],
-                    1 // Alpha
-                ],
-                variables: {
-                    redMin: defaults.redMin,
-                    redMax: defaults.redMax,
-                    greenMin: defaults.greenMin,
-                    greenMax: defaults.greenMax,
-                    nirMin: defaults.nirMin,
-                    nirMax: defaults.nirMax
-                }
+                    ['clamp', ['/', ['-', ['band', 1], 0], ['-', 3000, 0]], 0, 1],
+                    ['clamp', ['/', ['-', ['band', 2], 0], ['-', 3000, 0]], 0, 1],
+                    ['clamp', ['/', ['band', 3], 10000], 0, 1],
+                    1
+                ]
             }
         });
 
@@ -153,10 +190,7 @@ function loadSentinelCOG() {
 
         // Zoom to COG extent when ready
         cogSource.getView().then((viewConfig) => {
-            console.log('📍 COG loaded successfully');
-            console.log('📐 Extent:', viewConfig.extent);
-            console.log('🎯 Resolution:', viewConfig.resolutions);
-            
+            console.log('✅ COG loaded successfully');
             map.getView().fit(viewConfig.extent, {
                 padding: [50, 50, 50, 50],
                 duration: 1000
@@ -165,13 +199,59 @@ function loadSentinelCOG() {
             console.error('❌ Error getting COG view:', error);
         });
 
-        console.log('✅ Sentinel-2 COG loaded (4 bands)');
-        console.log('💡 Adjust sliders to change contrast stretch');
+        console.log('✅ Sentinel-2 COG loaded (4 bands from STAC)');
 
     } catch (error) {
         console.error('❌ Error loading COG:', error);
-        console.error('Stack:', error.stack);
-        alert('Error loading Sentinel-2 COG. Check console for details.\n\nMake sure geotiff.js is loaded before OpenLayers.');
+        loadFallbackCOG();
+    }
+}
+
+/**
+ * Fallback: Load a known working public COG example
+ * Using Planet Disaster Data (public, no auth required)
+ */
+function loadFallbackCOG() {
+    console.log('🔄 Loading fallback COG example...');
+    
+    try {
+        // Planet Disaster Data - Hurricane Harvey (public COG, no auth)
+        const fallbackUrl = 'https://storage.googleapis.com/pdd-stac/disasters/hurricane-harvey/0831/20170831_172754_101c_3B_AnalyticMS.tif';
+        
+        console.log('🔗 Fallback COG:', fallbackUrl);
+
+        cogSource = new ol.source.GeoTIFF({
+            sources: [
+                { url: fallbackUrl }
+            ],
+            crossOrigin: 'anonymous'
+        });
+
+        cogLayer = new ol.layer.WebGLTile({
+            source: cogSource,
+            style: {
+                color: [
+                    'array',
+                    ['/', ['band', 3], 255], // Red
+                    ['/', ['band', 2], 255], // Green
+                    ['/', ['band', 1], 255], // Blue
+                    1
+                ]
+            }
+        });
+
+        map.addLayer(cogLayer);
+
+        cogSource.getView().then((viewConfig) => {
+            console.log('✅ Fallback COG loaded');
+            map.getView().fit(viewConfig.extent, {
+                padding: [50, 50, 50, 50]
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ Fallback COG also failed:', error);
+        alert('Could not load any COG imagery. Check console for details.');
     }
 }
 
@@ -196,96 +276,38 @@ function updateContrastStretch() {
 
     // Update layer style with new stretch values
     if (cogLayer) {
-        // Get current visualization mode
         const vizMode = document.querySelector('input[name="visualization"]:checked').value;
 
         let color;
         if (vizMode === 'rgb') {
-            // True Color: Red (B04), Green (B03), Blue (B02)
             color = [
                 'array',
-                // Red channel: Band 1 (Red) with user-defined stretch
-                ['clamp',
-                    ['/', 
-                        ['-', ['band', 1], redMin], 
-                        ['-', redMax, redMin]
-                    ],
-                    0, 1
-                ],
-                // Green channel: Band 2 (Green) with user-defined stretch
-                ['clamp',
-                    ['/', 
-                        ['-', ['band', 2], greenMin], 
-                        ['-', greenMax, greenMin]
-                    ],
-                    0, 1
-                ],
-                // Blue channel: Band 3 (Blue) - fixed for simplicity
+                ['clamp', ['/', ['-', ['band', 1], redMin], ['-', redMax, redMin]], 0, 1],
+                ['clamp', ['/', ['-', ['band', 2], greenMin], ['-', greenMax, greenMin]], 0, 1],
                 ['clamp', ['/', ['band', 3], 10000], 0, 1],
-                1 // Alpha
+                1
             ];
         } else if (vizMode === 'nir-red-green') {
-            // False Color: NIR (B08) → Red, Red (B04) → Green, Green (B03) → Blue
             color = [
                 'array',
-                // Red channel: NIR (Band 4)
-                ['clamp',
-                    ['/', 
-                        ['-', ['band', 4], nirMin], 
-                        ['-', nirMax, nirMin]
-                    ],
-                    0, 1
-                ],
-                // Green channel: Red (Band 1)
-                ['clamp',
-                    ['/', 
-                        ['-', ['band', 1], redMin], 
-                        ['-', redMax, redMin]
-                    ],
-                    0, 1
-                ],
-                // Blue channel: Green (Band 2)
-                ['clamp',
-                    ['/', 
-                        ['-', ['band', 2], greenMin], 
-                        ['-', greenMax, greenMin]
-                    ],
-                    0, 1
-                ],
-                1 // Alpha
+                ['clamp', ['/', ['-', ['band', 4], nirMin], ['-', nirMax, nirMin]], 0, 1],
+                ['clamp', ['/', ['-', ['band', 1], redMin], ['-', redMax, redMin]], 0, 1],
+                ['clamp', ['/', ['-', ['band', 2], greenMin], ['-', greenMax, greenMin]], 0, 1],
+                1
             ];
         } else if (vizMode === 'ndvi') {
-            // NDVI: (NIR - Red) / (NIR + Red)
-            // Bands: NIR=Band4, Red=Band1
-            const ndvi = [
-                '/',
-                ['-', ['band', 4], ['band', 1]], // NIR - Red
-                ['+', ['band', 4], ['band', 1]]  // NIR + Red
-            ];
-            
-            // Color ramp: -1 (red) → 0 (yellow) → 1 (green)
+            const ndvi = ['/', ['-', ['band', 4], ['band', 1]], ['+', ['band', 4], ['band', 1]]];
             color = [
                 'array',
-                // Red channel: high when NDVI is low
                 ['interpolate', ['linear'], ndvi, -1, 1, 0, 1, 1, 0],
-                // Green channel: high when NDVI is high
                 ['interpolate', ['linear'], ndvi, -1, 0, 0, 1, 1, 1],
-                // Blue channel: low throughout
                 0,
-                1 // Alpha
+                1
             ];
         }
 
-        cogLayer.setStyle({
-            color: color
-        });
-
-        console.log('🎨 Contrast stretch updated:', { 
-            mode: vizMode, 
-            red: [redMin, redMax], 
-            green: [greenMin, greenMax], 
-            nir: [nirMin, nirMax] 
-        });
+        cogLayer.setStyle({ color: color });
+        console.log('🎨 Contrast stretch updated');
     }
 }
 
@@ -299,10 +321,7 @@ function resetToDefaults() {
     document.getElementById('green-max').value = defaults.greenMax;
     document.getElementById('nir-min').value = defaults.nirMin;
     document.getElementById('nir-max').value = defaults.nirMax;
-
-    // Reset to RGB mode
     document.querySelector('input[name="visualization"][value="rgb"]').checked = true;
-
     updateContrastStretch();
     console.log('🔄 Reset to defaults');
 }
@@ -311,18 +330,15 @@ function resetToDefaults() {
  * Initialize event listeners
  */
 function initializeEventListeners() {
-    // Slider event listeners
     const sliders = ['red-min', 'red-max', 'green-min', 'green-max', 'nir-min', 'nir-max'];
     sliders.forEach(sliderId => {
         document.getElementById(sliderId).addEventListener('input', updateContrastStretch);
     });
 
-    // Visualization mode radio buttons
     document.querySelectorAll('input[name="visualization"]').forEach(radio => {
         radio.addEventListener('change', updateContrastStretch);
     });
 
-    // Reset button
     document.getElementById('reset-button').addEventListener('click', resetToDefaults);
 
     console.log('✅ Event listeners initialized');
@@ -332,12 +348,11 @@ function initializeEventListeners() {
  * Main initialization
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Part 4: Sentinel-2 COG Contrast Stretch Application');
+    console.log('🚀 Part 4: Sentinel-2 COG via STAC API');
+    console.log('📡 Element 84 earth-search STAC catalog');
     
     initializeMap();
     initializeEventListeners();
     
     console.log('✅ Application ready!');
-    console.log('💡 Adjust the sliders to change the contrast stretch');
 });
-
