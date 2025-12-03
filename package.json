@@ -1,26 +1,36 @@
 {
   "name": "gist-604b-openlayers-enterprise-mapping",
   "version": "1.0.0",
-  "description": "M5A2: OpenLayers Enterprise Web Mapping - 3-part progressive tutorial",
+  "description": "M5A2: OpenLayers Enterprise Web Mapping - 4-part progressive tutorial",
   "main": "src/part2/index.html",
+  "type": "module",
   "scripts": {
     "start": "npx http-server src/part2 -p 8000 -o",
     "part1": "npx http-server src/part1 -p 8001 -o",
     "part2": "npx http-server src/part2 -p 8002 -o",
     "part3": "npx http-server src/part3 -p 8003 -o",
-    "part4": "npx http-server src/part4 -p 8004 -o"
+    "part4": "vite src/part4 --port 8004 --open",
+    "part4:build": "vite build src/part4",
+    "part4:preview": "vite preview --port 8004 --open"
   },
   "keywords": [
     "openlayers",
     "webgis",
     "mapping",
     "gis",
-    "enterprise"
+    "enterprise",
+    "cog",
+    "sentinel"
   ],
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "ol": "^10.2.1",
+    "geotiff": "^2.1.3"
+  },
   "devDependencies": {
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "vite": "^5.0.0"
   }
 }
 

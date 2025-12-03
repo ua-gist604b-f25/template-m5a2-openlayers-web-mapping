@@ -4,18 +4,30 @@
  * 
  * Demonstrates:
  * - Discovering Sentinel-2 COGs via STAC API
- * - Loading Cloud Optimized GeoTIFF with signed/public URLs
- * - WebGLTile layer for efficient rendering
+ * - Loading Cloud Optimized GeoTIFF (npm build required)
+ * - WebGLTile layer for GPU-accelerated rendering
  * - Dynamic contrast stretching with user controls
  * - Multi-band visualization (RGB, False Color, NDVI)
  * - Tucson, Arizona study area
  */
 
+// Import OpenLayers modules
+import 'ol/ol.css';
+import Map from 'ol/Map';
+import View from 'ol/View';
+import {fromLonLat} from 'ol/proj';
+import TileLayer from 'ol/layer/Tile';
+import WebGLTileLayer from 'ol/layer/WebGLTile';
+import OSM from 'ol/source/OSM';
+import GeoTIFF from 'ol/source/GeoTIFF';
+import {ScaleLine, FullScreen} from 'ol/control';
+
 let map;
 let cogLayer;
 let cogSource;
+let cogUrls = null; // Store COG URLs for band switching
 
-// Default contrast stretch values
+// Default contrast stretch values (for Sentinel-2 L2A, values are 0-10000)
 const defaults = {
     redMin: 0,
     redMax: 3000,
@@ -30,33 +42,32 @@ const tucsonCenter = [-110.9747, 32.2226]; // [lon, lat]
 const tucsonExtent = [-111.2, 32.0, -110.7, 32.5]; // [minLon, minLat, maxLon, maxLat]
 
 /**
- * Initialize the map and COG layer
+ * Initialize the map
  */
 function initializeMap() {
     console.log('🗺️ Initializing map...');
 
     // Create base OSM layer
-    const osmLayer = new ol.layer.Tile({
-        source: new ol.source.OSM(),
+    const osmLayer = new TileLayer({
+        source: new OSM(),
         opacity: 0.5
     });
 
     // Create map
-    map = new ol.Map({
+    map = new Map({
         target: 'map',
         layers: [osmLayer],
-        view: new ol.View({
-            center: ol.proj.fromLonLat(tucsonCenter),
-            zoom: 11,
-            projection: 'EPSG:3857'
+        view: new View({
+            center: fromLonLat(tucsonCenter),
+            zoom: 11
         })
     });
 
     // Add additional controls
-    map.addControl(new ol.control.ScaleLine({
+    map.addControl(new ScaleLine({
         units: 'metric'
     }));
-    map.addControl(new ol.control.FullScreen());
+    map.addControl(new FullScreen());
 
     console.log('✅ Map initialized');
     
@@ -79,7 +90,7 @@ async function searchSTACForScene() {
         // Search parameters
         const searchParams = {
             collections: ['sentinel-2-l2a'],
-            bbox: [-111.2, 32.0, -110.7, 32.5], // Tucson area
+            bbox: tucsonExtent,
             datetime: '2023-01-01T00:00:00Z/2023-12-31T23:59:59Z',
             limit: 1,
             query: {
@@ -124,11 +135,8 @@ async function searchSTACForScene() {
         // Extract COG URLs from assets
         const assets = scene.assets;
         
-        // Try to get TCI (True Color Image) first - single RGB composite
-        let cogUrl = assets.visual?.href || assets.true_color?.href;
-        
-        // If no TCI, try individual bands
-        const cogUrls = {
+        // Get individual band URLs (10m resolution bands)
+        cogUrls = {
             red: assets.red?.href || assets.B04?.href,
             green: assets.green?.href || assets.B03?.href,
             blue: assets.blue?.href || assets.B02?.href,
@@ -136,44 +144,39 @@ async function searchSTACForScene() {
         };
 
         console.log('🔗 COG URLs discovered:');
-        
-        if (cogUrl) {
-            console.log('  TCI (RGB composite):', cogUrl);
-            loadSingleCOG(cogUrl);
-        } else if (cogUrls.red && cogUrls.green && cogUrls.blue) {
-            console.log('  Red:', cogUrls.red);
-            console.log('  Green:', cogUrls.green);
-            console.log('  Blue:', cogUrls.blue);
-            console.log('  NIR:', cogUrls.nir);
+        console.log('  Red (B04):', cogUrls.red);
+        console.log('  Green (B03):', cogUrls.green);
+        console.log('  Blue (B02):', cogUrls.blue);
+        console.log('  NIR (B08):', cogUrls.nir);
+
+        if (cogUrls.red && cogUrls.green && cogUrls.blue && cogUrls.nir) {
             loadMultiBandCOG(cogUrls);
         } else {
-            throw new Error('No suitable COG assets found in STAC response');
+            throw new Error('Missing required bands (R, G, B, NIR)');
         }
 
     } catch (error) {
         console.error('❌ Error searching STAC:', error);
         console.log('⚠️ Falling back to example COG...');
-        
-        // Fallback to known working example
         loadFallbackCOG();
     }
 }
 
 /**
- * Load a single RGB composite COG (TCI - True Color Image)
- * This is more reliable than loading separate bands
+ * Load multi-band COG (separate Red, Green, Blue, NIR files)
+ * This enables full band math and custom visualizations
  */
-function loadSingleCOG(cogUrl) {
-    console.log('🛰️ Loading Sentinel-2 TCI (RGB composite)...');
-    console.log('🔗 URL:', cogUrl);
+function loadMultiBandCOG(urls) {
+    console.log('🛰️ Loading Sentinel-2 multi-band COGs...');
 
     try {
-        cogSource = new ol.source.GeoTIFF({
+        // Create GeoTIFF source with all 4 bands
+        cogSource = new GeoTIFF({
             sources: [
-                {
-                    url: cogUrl,
-                    max: 255  // TCI is 8-bit RGB
-                }
+                { url: urls.red, nodata: 0 },     // Band 1
+                { url: urls.green, nodata: 0 },   // Band 2  
+                { url: urls.blue, nodata: 0 },    // Band 3
+                { url: urls.nir, nodata: 0 }      // Band 4
             ],
             crossOrigin: 'anonymous',
             interpolate: false
@@ -182,18 +185,16 @@ function loadSingleCOG(cogUrl) {
         // Wait for source to be ready
         cogSource.getView().then((viewConfig) => {
             console.log('✅ COG source ready');
-            console.log('📐 Image extent:', viewConfig.extent);
-            console.log('📊 Projection:', viewConfig.projection);
+            console.log('📐 Bands available:', cogSource.getBands ? cogSource.getBands().length : 4);
             
-            // Use DataTile layer instead of WebGLTile (more reliable with CDN)
-            cogLayer = new ol.layer.Tile({
+            // Create WebGLTile layer with initial RGB visualization
+            cogLayer = new WebGLTileLayer({
                 source: cogSource,
-                opacity: 1.0
+                style: createRGBStyle()
             });
 
             map.addLayer(cogLayer);
-            console.log('✅ Tile layer added to map');
-            console.log('💡 TCI should be visible now (pre-processed RGB)');
+            console.log('✅ WebGLTile layer added with GPU acceleration');
 
             // Zoom to extent
             map.getView().fit(viewConfig.extent, {
@@ -201,85 +202,166 @@ function loadSingleCOG(cogUrl) {
                 duration: 1000
             });
             
-            console.log('✅ Sentinel-2 TCI loaded successfully');
-            console.log('ℹ️ Note: Using Tile layer instead of WebGLTile for CDN compatibility');
+            console.log('✅ Sentinel-2 COG loaded successfully (4 bands)');
+            console.log('💡 Use sliders to adjust contrast stretch');
 
         }).catch((error) => {
-            console.error('❌ Error loading TCI:', error);
-            console.error('Details:', error.message, error.stack);
+            console.error('❌ Error loading multi-band COG:', error);
             loadFallbackCOG();
         });
 
     } catch (error) {
-        console.error('❌ Error creating TCI source:', error);
+        console.error('❌ Error creating multi-band COG source:', error);
         loadFallbackCOG();
     }
 }
 
 /**
- * Load multi-band COG (separate Red, Green, Blue, NIR files)
- * More complex but allows band math
+ * Create RGB visualization style
  */
-function loadMultiBandCOG(cogUrls) {
-    console.log('🛰️ Loading Sentinel-2 multi-band COGs...');
-    console.log('⚠️ Warning: Multi-band loading may be unstable with CDN version');
-    
-    // For now, just load Red band as a fallback
-    console.log('🔄 Using single band (Red) instead of multi-band');
-    loadSingleCOG(cogUrls.red);
+function createRGBStyle() {
+    const redMin = parseInt(document.getElementById('red-min').value);
+    const redMax = parseInt(document.getElementById('red-max').value);
+    const greenMin = parseInt(document.getElementById('green-min').value);
+    const greenMax = parseInt(document.getElementById('green-max').value);
+
+    return {
+        color: [
+            'array',
+            ['interpolate', ['linear'], ['band', 1], redMin, 0, redMax, 1],   // Red
+            ['interpolate', ['linear'], ['band', 2], greenMin, 0, greenMax, 1], // Green
+            ['interpolate', ['linear'], ['band', 3], 0, 0, 3000, 1],           // Blue (fixed)
+            1
+        ]
+    };
 }
 
 /**
- * Load Sentinel-2 COG bands (DEPRECATED - kept for reference)
+ * Create False Color (NIR-R-G) visualization style
  */
-function loadSentinelCOG(cogUrls) {
-    // Redirect to single or multi-band loader
-    if (typeof cogUrls === 'string') {
-        loadSingleCOG(cogUrls);
-    } else {
-        loadMultiBandCOG(cogUrls);
+function createFalseColorStyle() {
+    const nirMin = parseInt(document.getElementById('nir-min').value);
+    const nirMax = parseInt(document.getElementById('nir-max').value);
+    const redMin = parseInt(document.getElementById('red-min').value);
+    const redMax = parseInt(document.getElementById('red-max').value);
+    const greenMin = parseInt(document.getElementById('green-min').value);
+    const greenMax = parseInt(document.getElementById('green-max').value);
+
+    return {
+        color: [
+            'array',
+            ['interpolate', ['linear'], ['band', 4], nirMin, 0, nirMax, 1],   // NIR → Red
+            ['interpolate', ['linear'], ['band', 1], redMin, 0, redMax, 1],   // Red → Green
+            ['interpolate', ['linear'], ['band', 2], greenMin, 0, greenMax, 1], // Green → Blue
+            1
+        ]
+    };
+}
+
+/**
+ * Create NDVI visualization style
+ */
+function createNDVIStyle() {
+    return {
+        color: [
+            'case',
+            // NDVI = (NIR - Red) / (NIR + Red)
+            ['>', ['+', ['band', 4], ['band', 1]], 0], // Avoid division by zero
+            [
+                'interpolate',
+                ['linear'],
+                ['/', ['-', ['band', 4], ['band', 1]], ['+', ['band', 4], ['band', 1]]],
+                -1, ['color', 0, 0, 255],     // Water/bare soil: blue
+                0, ['color', 139, 69, 19],    // Low vegetation: brown
+                0.2, ['color', 255, 255, 0],  // Sparse vegetation: yellow
+                0.4, ['color', 173, 255, 47], // Medium vegetation: yellow-green
+                0.6, ['color', 0, 255, 0],    // Dense vegetation: green
+                1, ['color', 0, 100, 0]       // Very dense vegetation: dark green
+            ],
+            ['color', 0, 0, 0, 0]  // Transparent for invalid areas
+        ],
+        opacity: 0.8
+    };
+}
+
+/**
+ * Update visualization based on selected mode and contrast settings
+ */
+function updateContrastStretch() {
+    if (!cogLayer) {
+        console.warn('⚠️ COG layer not ready yet');
+        return;
+    }
+
+    const vizMode = document.querySelector('input[name="visualization"]:checked').value;
+    
+    // Update display values
+    document.getElementById('red-min-value').textContent = document.getElementById('red-min').value;
+    document.getElementById('red-max-value').textContent = document.getElementById('red-max').value;
+    document.getElementById('green-min-value').textContent = document.getElementById('green-min').value;
+    document.getElementById('green-max-value').textContent = document.getElementById('green-max').value;
+    document.getElementById('nir-min-value').textContent = document.getElementById('nir-min').value;
+    document.getElementById('nir-max-value').textContent = document.getElementById('nir-max').value;
+
+    let newStyle;
+    switch (vizMode) {
+        case 'rgb':
+            newStyle = createRGBStyle();
+            console.log('🎨 Switched to True Color (RGB)');
+            break;
+        case 'nir-red-green':
+            newStyle = createFalseColorStyle();
+            console.log('🌿 Switched to False Color (NIR-R-G)');
+            break;
+        case 'ndvi':
+            newStyle = createNDVIStyle();
+            console.log('📊 Switched to NDVI');
+            break;
+    }
+
+    try {
+        cogLayer.setStyle(newStyle);
+        console.log('✅ Visualization updated');
+    } catch (error) {
+        console.error('❌ Error updating visualization:', error);
     }
 }
 
 /**
  * Fallback: Load a known working public COG example
- * Using Planet Disaster Data (public, no auth required)
  */
 function loadFallbackCOG() {
     console.log('🔄 Loading fallback COG example...');
     
     try {
-        // Planet Disaster Data - Hurricane Harvey (public COG, no auth)
-        const fallbackUrl = 'https://storage.googleapis.com/pdd-stac/disasters/hurricane-harvey/0831/20170831_172754_101c_3B_AnalyticMS.tif';
+        // Use a simple single-band grayscale example
+        const fallbackUrl = 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/53/H/PA/2021/7/S2A_53HPA_20210723_0_L2A/B04.tif';
         
         console.log('🔗 Fallback COG:', fallbackUrl);
 
-        cogSource = new ol.source.GeoTIFF({
-            sources: [
-                { url: fallbackUrl }
-            ],
+        cogSource = new GeoTIFF({
+            sources: [{ url: fallbackUrl }],
             crossOrigin: 'anonymous'
         });
 
-        // Wait for source to be ready before creating layer
         cogSource.getView().then((viewConfig) => {
             console.log('✅ Fallback COG source ready');
             
-            cogLayer = new ol.layer.WebGLTile({
+            cogLayer = new WebGLTileLayer({
                 source: cogSource,
                 style: {
                     color: [
-                        'array',
-                        ['/', ['band', 3], 255], // Red
-                        ['/', ['band', 2], 255], // Green
-                        ['/', ['band', 1], 255], // Blue
-                        1
+                        'interpolate',
+                        ['linear'],
+                        ['band', 1],
+                        0, ['color', 0, 0, 0],
+                        3000, ['color', 255, 255, 255]
                     ]
                 }
             });
 
             map.addLayer(cogLayer);
-            console.log('✅ Fallback COG loaded');
+            console.log('✅ Fallback COG loaded (grayscale)');
             
             map.getView().fit(viewConfig.extent, {
                 padding: [50, 50, 50, 50]
@@ -293,41 +375,6 @@ function loadFallbackCOG() {
     } catch (error) {
         console.error('❌ Fallback COG initialization error:', error);
         alert('Could not load any COG imagery. Check console for details.');
-    }
-}
-
-/**
- * Update contrast stretch based on slider values
- * Note: With regular Tile layer, contrast stretch is limited
- * (WebGLTile required for advanced contrast control, but has CDN compatibility issues)
- */
-function updateContrastStretch() {
-    const redMin = parseInt(document.getElementById('red-min').value);
-    const redMax = parseInt(document.getElementById('red-max').value);
-    const greenMin = parseInt(document.getElementById('green-min').value);
-    const greenMax = parseInt(document.getElementById('green-max').value);
-
-    // Update display values
-    document.getElementById('red-min-value').textContent = redMin;
-    document.getElementById('red-max-value').textContent = redMax;
-    document.getElementById('green-min-value').textContent = greenMin;
-    document.getElementById('green-max-value').textContent = greenMax;
-    document.getElementById('nir-min-value').textContent = 'N/A';
-    document.getElementById('nir-max-value').textContent = 'N/A';
-
-    // With regular Tile layer, we can only adjust opacity
-    // (True contrast stretch requires WebGLTile which has CDN issues)
-    if (cogLayer) {
-        const vizMode = document.querySelector('input[name="visualization"]:checked').value;
-        
-        // Calculate opacity based on average brightness setting
-        const avgBrightness = ((redMax + greenMax) / 2) / 3000.0;
-        const opacity = Math.min(1.0, avgBrightness);
-        
-        cogLayer.setOpacity(opacity);
-        
-        console.log('🎨 Adjusted opacity:', opacity.toFixed(2), '(Full contrast stretch requires WebGLTile/npm build)');
-        console.log('ℹ️ TCI is pre-processed RGB - should be visible without stretch');
     }
 }
 
@@ -368,8 +415,9 @@ function initializeEventListeners() {
  * Main initialization
  */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Part 4: Sentinel-2 COG via STAC API');
+    console.log('🚀 Part 4: Sentinel-2 COG via STAC API (npm build version)');
     console.log('📡 Element 84 earth-search STAC catalog');
+    console.log('⚡ Using WebGLTile for GPU-accelerated rendering');
     
     initializeMap();
     initializeEventListeners();

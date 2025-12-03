@@ -106,21 +106,42 @@ Value 1750 → (1750-500)/(3000-500) * 255 = 127
 
 ## 🚀 Running the Example
 
-### Start the Development Server:
+### ⚠️ Important: Part 4 Requires npm Build
+
+Unlike Parts 1-3, **Part 4 requires building with npm** because:
+- COG rendering needs `ol.source.GeoTIFF` and `geotiff` library
+- WebGLTile layer requires proper module bundling  
+- ES6 imports need to be transpiled
+
+### First Time Setup:
 
 ```bash
-# Option 1: Using npm (from project root)
-npm run part4
-
-# Option 2: Using Python
-cd src/part4
-python3 -m http.server 8003
-
-# Option 3: Using npx http-server
-npx http-server src/part4 -p 8003 -o
+# Install dependencies (run once from project root)
+npm install
 ```
 
-Then open: `http://localhost:8003`
+This installs:
+- `ol` (OpenLayers v10.2.1)
+- `geotiff` (GeoTIFF.js v2.1.3)
+- `vite` (Build tool)
+
+### Running Part 4:
+
+```bash
+# Option 1: Development server with hot reload (recommended)
+npm run part4
+
+# Option 2: Build for production
+npm run part4:build
+
+# Option 3: Preview production build
+npm run part4:preview
+```
+
+The development server will automatically:
+- Bundle OpenLayers and GeoTIFF
+- Enable hot module replacement
+- Open your browser to `http://localhost:8004`
 
 ---
 
@@ -148,46 +169,64 @@ Then open: `http://localhost:8003`
 
 ## 📚 Technical Implementation
 
-### CDN vs npm Build Considerations:
+### Why npm Build is Required:
 
-**This demo uses OpenLayers via CDN** for simplicity and ease of deployment. However, this has important limitations:
+**CDN Limitations:**
+- ❌ `ol.source.GeoTIFF` requires `geotiff.js` as a dependency
+- ❌ Multi-band COG rendering fails with "Rendering array data is not yet supported"
+- ❌ WebGLTile has compatibility issues with standalone CDN bundle
 
-- **Tile Layer (not WebGLTile):** Using `ol.layer.Tile` for reliability with CDN
-- **Limited Contrast Stretch:** Full GPU-accelerated contrast stretching requires `ol.layer.WebGLTile`, which has compatibility issues with the CDN version
-- **TCI Asset:** Using True Color Image (TCI) which is pre-processed RGB (0-255 values)
-- **Pre-rendered Imagery:** The TCI is already processed by ESA and should be immediately visible
+**npm Build Advantages:**
+- ✅ Proper dependency management (`ol` + `geotiff`)
+- ✅ WebGLTile layer with GPU-accelerated rendering
+- ✅ Multi-band COG support with band math
+- ✅ Tree-shaking for smaller bundle size
+- ✅ Modern ES6 module syntax
 
-**For Production/Advanced Features (use npm):**
-```bash
-npm install ol geotiff
+### Project Structure:
+
 ```
-Then you can:
-- Use `ol.layer.WebGLTile` for GPU-accelerated rendering
-- Implement advanced contrast stretching with band math
-- Load individual bands (R, G, B, NIR) for custom composites
-- Create false-color and NDVI visualizations
+src/part4/
+├── index.html          # Entry point (no CDN scripts)
+├── js/
+│   └── main.js         # ES6 modules with imports
+├── css/
+│   └── styles.css
+└── README.md
+```
 
 ### Key OpenLayers Components (npm version):
 
 ```javascript
-// 1. GeoTIFF Source (reads COG)
-const cogSource = new ol.source.GeoTIFF({
-    sources: [{ url: 'sentinel-cog-url.tif' }],
+// ES6 imports (not possible with CDN)
+import 'ol/ol.css';
+import Map from 'ol/Map';
+import GeoTIFF from 'ol/source/GeoTIFF';
+import WebGLTileLayer from 'ol/layer/WebGLTile';
+
+// Create multi-band COG source
+const cogSource = new GeoTIFF({
+    sources: [
+        { url: redBandUrl, nodata: 0 },
+        { url: greenBandUrl, nodata: 0 },
+        { url: blueBandUrl, nodata: 0 },
+        { url: nirBandUrl, nodata: 0 }
+    ],
     crossOrigin: 'anonymous'
 });
 
-// 2. WebGLTile Layer (GPU-accelerated rendering) - requires npm build
-const cogLayer = new ol.layer.WebGLTile({
+// GPU-accelerated rendering with WebGLTile
+const cogLayer = new WebGLTileLayer({
     source: cogSource,
     style: {
-        color: ['array', /* band math expressions */],
-        variables: { /* stretch parameters */ }
+        color: [
+            'array',
+            ['interpolate', ['linear'], ['band', 1], 0, 0, 3000, 1], // Red
+            ['interpolate', ['linear'], ['band', 2], 0, 0, 3000, 1], // Green
+            ['interpolate', ['linear'], ['band', 3], 0, 0, 3000, 1], // Blue
+            1
+        ]
     }
-});
-
-// 3. Dynamic Style Update
-cogLayer.setStyle({
-    color: ['interpolate', ['linear'], ['band', 1], min, 0, max, 1]
 });
 ```
 
@@ -201,13 +240,24 @@ const response = await fetch('https://earth-search.aws.element84.com/v1/search',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
         collections: ['sentinel-2-l2a'],
-        bbox: [-111.1, 32.1, -110.7, 32.4], // Tucson
+        bbox: [-111.2, 32.0, -110.7, 32.5], // Tucson
         datetime: '2023-01-01T00:00:00Z/2023-12-31T23:59:59Z',
         limit: 1,
         sortby: [{ field: 'properties.eo:cloud_cover', direction: 'asc' }]
     })
 });
 ```
+
+### Vite Configuration:
+
+Vite automatically handles:
+- Bundling OpenLayers + GeoTIFF
+- ES6 module transpilation
+- CSS processing
+- Development server with HMR
+- Production optimization
+
+No configuration file needed for this simple setup!
 
 ### Band Math Expressions:
 

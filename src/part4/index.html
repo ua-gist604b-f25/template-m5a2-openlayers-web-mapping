@@ -5,14 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Part 4: Sentinel-2 COG with Contrast Stretch - Tucson, AZ</title>
     
-    <!-- OpenLayers CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
-    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/styles.css">
-    
-    <!-- GeoTIFF.js (required for ol.source.GeoTIFF) -->
-    <script src="https://cdn.jsdelivr.net/npm/geotiff@2.0.7/dist-browser/geotiff.js"></script>
 </head>
 <body>
     <div class="container">
@@ -107,11 +101,8 @@
         </div>
     </div>
 
-    <!-- OpenLayers JS -->
-    <script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
-    
-    <!-- Custom JS -->
-    <script src="js/main.js"></script>
+    <!-- Main JS module (Vite will bundle with OpenLayers + GeoTIFF) -->
+    <script type="module" src="./js/main.js"></script>
 </body>
 </html>
 
