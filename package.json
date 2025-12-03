@@ -7,7 +7,8 @@
     "start": "npx http-server src/part2 -p 8000 -o",
     "part1": "npx http-server src/part1 -p 8001 -o",
     "part2": "npx http-server src/part2 -p 8002 -o",
-    "part3": "npx http-server src/part3 -p 8003 -o"
+    "part3": "npx http-server src/part3 -p 8003 -o",
+    "part4": "npx http-server src/part4 -p 8004 -o"
   },
   "keywords": [
     "openlayers",
