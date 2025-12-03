@@ -131,6 +131,22 @@ async function searchSTACForScene() {
         console.log('✅ Found scene:', scene.id);
         console.log('📅 Date:', scene.properties.datetime);
         console.log('☁️ Cloud cover:', scene.properties['eo:cloud_cover'], '%');
+        console.log('🗺️ Scene geometry:', scene.geometry);
+        console.log('📦 Scene bbox:', scene.bbox);
+        
+        // Check if scene actually intersects Tucson
+        if (scene.bbox) {
+            const [minLon, minLat, maxLon, maxLat] = scene.bbox;
+            const tucsonLon = tucsonCenter[0];
+            const tucsonLat = tucsonCenter[1];
+            const containsTucson = tucsonLon >= minLon && tucsonLon <= maxLon && 
+                                   tucsonLat >= minLat && tucsonLat <= maxLat;
+            console.log('✓ Scene contains Tucson:', containsTucson);
+            if (!containsTucson) {
+                console.warn('⚠️ STAC returned scene that does NOT contain Tucson!');
+                console.warn('   This might be a STAC API issue. Using it anyway as example.');
+            }
+        }
         
         // Extract COG URLs from assets
         const assets = scene.assets;
@@ -186,6 +202,8 @@ function loadMultiBandCOG(urls) {
         cogSource.getView().then((viewConfig) => {
             console.log('✅ COG source ready');
             console.log('📐 Bands available:', cogSource.getBands ? cogSource.getBands().length : 4);
+            console.log('📐 COG extent:', viewConfig.extent);
+            console.log('📐 COG projection:', viewConfig.projection);
             
             // Create WebGLTile layer with initial RGB visualization
             cogLayer = new WebGLTileLayer({
@@ -196,11 +214,10 @@ function loadMultiBandCOG(urls) {
             map.addLayer(cogLayer);
             console.log('✅ WebGLTile layer added with GPU acceleration');
 
-            // Zoom to extent
-            map.getView().fit(viewConfig.extent, {
-                padding: [50, 50, 50, 50],
-                duration: 1000
-            });
+            // Keep map centered on Tucson (don't zoom to COG extent)
+            // The COG should cover Tucson if STAC search worked correctly
+            console.log('📍 Keeping map centered on Tucson, Arizona');
+            console.log('ℹ️ If COG not visible, check that STAC returned correct scene');
             
             console.log('✅ Sentinel-2 COG loaded successfully (4 bands)');
             console.log('💡 Use sliders to adjust contrast stretch');
