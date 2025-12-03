@@ -65,29 +65,57 @@ function initializeMap() {
 
 /**
  * Load Sentinel-2 Cloud Optimized GeoTIFF
- * Using public Sentinel-2 COG from AWS Open Data
+ * Using public Sentinel-2 COG from AWS Open Data (discoverable via STAC)
+ * 
+ * STAC Search Process:
+ * 1. Search STAC catalog: https://earth-search.aws.element84.com/v1
+ * 2. Filter by location (Tucson area: -111, 32)
+ * 3. Filter by date and cloud cover
+ * 4. Extract COG URLs from assets
  */
 function loadSentinelCOG() {
     console.log('🛰️ Loading Sentinel-2 COG...');
+    console.log('📍 Study Area: Tucson, Arizona');
 
     try {
-        // Public Sentinel-2 L2A COG from AWS
-        // Example: Tucson area - Scene from Sentinel-2 COGs on AWS
-        // Note: This is a real public COG URL. You may need to find a specific scene for Tucson.
-        const cogUrl = 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/32/S/NP/2023/7/S2A_32SNP_20230715_0_L2A/TCI.tif';
+        // Real Sentinel-2 L2A COG from AWS (discovered via STAC)
+        // Scene: S2A_12SUA_20231015_0_L2A (October 15, 2023)
+        // Tile: 12SUA (covers Tucson area)
+        // Source: https://earth-search.aws.element84.com/v1
+        
+        // Individual band COGs for multispectral analysis
+        const bands = {
+            red: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B04.tif',
+            green: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B03.tif',
+            blue: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B02.tif',
+            nir: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/UA/2023/10/S2A_12SUA_20231015_0_L2A/B08.tif'
+        };
 
+        console.log('📦 Loading bands:', Object.keys(bands));
+        console.log('🔗 Red band URL:', bands.red);
+
+        // Create GeoTIFF source with multiple bands
         cogSource = new ol.source.GeoTIFF({
             sources: [
                 {
-                    url: cogUrl,
-                    // Normalize: true converts values to 0-1 range
-                    normalize: false,
-                    // For multispectral, we can specify band configuration
-                    // Sentinel-2 L2A TCI (True Color Image) has RGB bands
+                    url: bands.red,
+                    max: 10000  // Sentinel-2 L2A typical max value
+                },
+                {
+                    url: bands.green,
+                    max: 10000
+                },
+                {
+                    url: bands.blue,
+                    max: 10000
+                },
+                {
+                    url: bands.nir,
+                    max: 10000
                 }
             ],
-            // Allow cross-origin requests
-            crossOrigin: 'anonymous'
+            crossOrigin: 'anonymous',
+            interpolate: false  // Preserve pixel values
         });
 
         // Create WebGLTile layer with contrast stretch
@@ -96,12 +124,20 @@ function loadSentinelCOG() {
             style: {
                 color: [
                     'array',
-                    ['/', ['band', 1], 255], // Red (normalize to 0-1)
-                    ['/', ['band', 2], 255], // Green
-                    ['/', ['band', 3], 255], // Blue
+                    // Red channel: Band 1 (Red) with linear stretch
+                    ['/', 
+                        ['-', ['band', 1], ['var', 'redMin']], 
+                        ['-', ['var', 'redMax'], ['var', 'redMin']]
+                    ],
+                    // Green channel: Band 2 (Green) with linear stretch
+                    ['/', 
+                        ['-', ['band', 2], ['var', 'greenMin']], 
+                        ['-', ['var', 'greenMax'], ['var', 'greenMin']]
+                    ],
+                    // Blue channel: Band 3 (Blue) - fixed range for simplicity
+                    ['/', ['band', 3], 10000],
                     1 // Alpha
                 ],
-                // Enable contrast stretching
                 variables: {
                     redMin: defaults.redMin,
                     redMax: defaults.redMax,
@@ -117,7 +153,10 @@ function loadSentinelCOG() {
 
         // Zoom to COG extent when ready
         cogSource.getView().then((viewConfig) => {
-            console.log('📍 COG loaded, extent:', viewConfig.extent);
+            console.log('📍 COG loaded successfully');
+            console.log('📐 Extent:', viewConfig.extent);
+            console.log('🎯 Resolution:', viewConfig.resolutions);
+            
             map.getView().fit(viewConfig.extent, {
                 padding: [50, 50, 50, 50],
                 duration: 1000
@@ -126,11 +165,13 @@ function loadSentinelCOG() {
             console.error('❌ Error getting COG view:', error);
         });
 
-        console.log('✅ Sentinel-2 COG loaded');
+        console.log('✅ Sentinel-2 COG loaded (4 bands)');
+        console.log('💡 Adjust sliders to change contrast stretch');
 
     } catch (error) {
         console.error('❌ Error loading COG:', error);
-        alert('Error loading Sentinel-2 imagery. Please check the console for details.');
+        console.error('Stack:', error.stack);
+        alert('Error loading Sentinel-2 COG. Check console for details.\n\nMake sure geotiff.js is loaded before OpenLayers.');
     }
 }
 
@@ -160,37 +201,78 @@ function updateContrastStretch() {
 
         let color;
         if (vizMode === 'rgb') {
-            // True Color: Red, Green, Blue
+            // True Color: Red (B04), Green (B03), Blue (B02)
             color = [
                 'array',
-                ['interpolate', ['linear'], ['band', 1], redMin, 0, redMax, 1],  // Red
-                ['interpolate', ['linear'], ['band', 2], greenMin, 0, greenMax, 1], // Green
-                ['interpolate', ['linear'], ['band', 3], 0, 0, 255, 1], // Blue (fixed for TCI)
-                1
+                // Red channel: Band 1 (Red) with user-defined stretch
+                ['clamp',
+                    ['/', 
+                        ['-', ['band', 1], redMin], 
+                        ['-', redMax, redMin]
+                    ],
+                    0, 1
+                ],
+                // Green channel: Band 2 (Green) with user-defined stretch
+                ['clamp',
+                    ['/', 
+                        ['-', ['band', 2], greenMin], 
+                        ['-', greenMax, greenMin]
+                    ],
+                    0, 1
+                ],
+                // Blue channel: Band 3 (Blue) - fixed for simplicity
+                ['clamp', ['/', ['band', 3], 10000], 0, 1],
+                1 // Alpha
             ];
         } else if (vizMode === 'nir-red-green') {
-            // False Color: NIR, Red, Green
+            // False Color: NIR (B08) → Red, Red (B04) → Green, Green (B03) → Blue
             color = [
                 'array',
-                ['interpolate', ['linear'], ['band', 1], nirMin, 0, nirMax, 1],  // NIR -> Red
-                ['interpolate', ['linear'], ['band', 1], redMin, 0, redMax, 1],  // Red -> Green
-                ['interpolate', ['linear'], ['band', 2], greenMin, 0, greenMax, 1], // Green -> Blue
-                1
+                // Red channel: NIR (Band 4)
+                ['clamp',
+                    ['/', 
+                        ['-', ['band', 4], nirMin], 
+                        ['-', nirMax, nirMin]
+                    ],
+                    0, 1
+                ],
+                // Green channel: Red (Band 1)
+                ['clamp',
+                    ['/', 
+                        ['-', ['band', 1], redMin], 
+                        ['-', redMax, redMin]
+                    ],
+                    0, 1
+                ],
+                // Blue channel: Green (Band 2)
+                ['clamp',
+                    ['/', 
+                        ['-', ['band', 2], greenMin], 
+                        ['-', greenMax, greenMin]
+                    ],
+                    0, 1
+                ],
+                1 // Alpha
             ];
         } else if (vizMode === 'ndvi') {
             // NDVI: (NIR - Red) / (NIR + Red)
-            // Display as grayscale where higher values = more vegetation
+            // Bands: NIR=Band4, Red=Band1
             const ndvi = [
                 '/',
-                ['-', ['band', 1], ['band', 1]], // NIR - Red (simplified for TCI)
-                ['+', ['band', 1], ['band', 1]]  // NIR + Red
+                ['-', ['band', 4], ['band', 1]], // NIR - Red
+                ['+', ['band', 4], ['band', 1]]  // NIR + Red
             ];
+            
+            // Color ramp: -1 (red) → 0 (yellow) → 1 (green)
             color = [
                 'array',
-                ndvi, // Red channel
-                ndvi, // Green channel
-                ndvi, // Blue channel
-                1
+                // Red channel: high when NDVI is low
+                ['interpolate', ['linear'], ndvi, -1, 1, 0, 1, 1, 0],
+                // Green channel: high when NDVI is high
+                ['interpolate', ['linear'], ndvi, -1, 0, 0, 1, 1, 1],
+                // Blue channel: low throughout
+                0,
+                1 // Alpha
             ];
         }
 
@@ -198,7 +280,12 @@ function updateContrastStretch() {
             color: color
         });
 
-        console.log('🎨 Contrast stretch updated:', { redMin, redMax, greenMin, greenMax, nirMin, nirMax });
+        console.log('🎨 Contrast stretch updated:', { 
+            mode: vizMode, 
+            red: [redMin, redMax], 
+            green: [greenMin, greenMax], 
+            nir: [nirMin, nirMax] 
+        });
     }
 }
 
