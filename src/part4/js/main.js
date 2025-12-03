@@ -172,37 +172,44 @@ function loadSentinelCOG(cogUrls) {
             interpolate: false
         });
 
-        // Create WebGLTile layer with contrast stretch
-        cogLayer = new ol.layer.WebGLTile({
-            source: cogSource,
-            style: {
-                color: [
-                    'array',
-                    ['clamp', ['/', ['-', ['band', 1], 0], ['-', 3000, 0]], 0, 1],
-                    ['clamp', ['/', ['-', ['band', 2], 0], ['-', 3000, 0]], 0, 1],
-                    ['clamp', ['/', ['band', 3], 10000], 0, 1],
-                    1
-                ]
-            }
-        });
-
-        map.addLayer(cogLayer);
-
-        // Zoom to COG extent when ready
+        // Wait for source to be ready before creating layer
         cogSource.getView().then((viewConfig) => {
-            console.log('✅ COG loaded successfully');
+            console.log('✅ COG source ready');
+            console.log('📐 Bands available:', viewConfig.bandCount || 4);
+            
+            // NOW create the WebGLTile layer after source is ready
+            cogLayer = new ol.layer.WebGLTile({
+                source: cogSource,
+                style: {
+                    color: [
+                        'array',
+                        ['clamp', ['/', ['-', ['band', 1], 0], ['-', 3000, 0]], 0, 1],
+                        ['clamp', ['/', ['-', ['band', 2], 0], ['-', 3000, 0]], 0, 1],
+                        ['clamp', ['/', ['band', 3], 10000], 0, 1],
+                        1
+                    ]
+                }
+            });
+
+            map.addLayer(cogLayer);
+            console.log('✅ WebGLTile layer added to map');
+
+            // Zoom to extent
             map.getView().fit(viewConfig.extent, {
                 padding: [50, 50, 50, 50],
                 duration: 1000
             });
+            
+            console.log('✅ Sentinel-2 COG loaded (4 bands from STAC)');
+
         }).catch((error) => {
-            console.error('❌ Error getting COG view:', error);
+            console.error('❌ Error loading COG source:', error);
+            console.error('Error details:', error.message);
+            loadFallbackCOG();
         });
 
-        console.log('✅ Sentinel-2 COG loaded (4 bands from STAC)');
-
     } catch (error) {
-        console.error('❌ Error loading COG:', error);
+        console.error('❌ Error creating COG source:', error);
         loadFallbackCOG();
     }
 }
@@ -227,30 +234,37 @@ function loadFallbackCOG() {
             crossOrigin: 'anonymous'
         });
 
-        cogLayer = new ol.layer.WebGLTile({
-            source: cogSource,
-            style: {
-                color: [
-                    'array',
-                    ['/', ['band', 3], 255], // Red
-                    ['/', ['band', 2], 255], // Green
-                    ['/', ['band', 1], 255], // Blue
-                    1
-                ]
-            }
-        });
-
-        map.addLayer(cogLayer);
-
+        // Wait for source to be ready before creating layer
         cogSource.getView().then((viewConfig) => {
+            console.log('✅ Fallback COG source ready');
+            
+            cogLayer = new ol.layer.WebGLTile({
+                source: cogSource,
+                style: {
+                    color: [
+                        'array',
+                        ['/', ['band', 3], 255], // Red
+                        ['/', ['band', 2], 255], // Green
+                        ['/', ['band', 1], 255], // Blue
+                        1
+                    ]
+                }
+            });
+
+            map.addLayer(cogLayer);
             console.log('✅ Fallback COG loaded');
+            
             map.getView().fit(viewConfig.extent, {
                 padding: [50, 50, 50, 50]
             });
+            
+        }).catch((error) => {
+            console.error('❌ Fallback COG failed to load:', error);
+            alert('Could not load any COG imagery. Check console for details.');
         });
 
     } catch (error) {
-        console.error('❌ Fallback COG also failed:', error);
+        console.error('❌ Fallback COG initialization error:', error);
         alert('Could not load any COG imagery. Check console for details.');
     }
 }
