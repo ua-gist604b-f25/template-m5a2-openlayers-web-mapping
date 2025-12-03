@@ -205,6 +205,10 @@ function loadMultiBandCOG(urls) {
             console.log('📐 COG extent:', viewConfig.extent);
             console.log('📐 COG projection:', viewConfig.projection);
             
+            // Log source details for debugging
+            const sources = cogSource.getSources();
+            console.log('📊 COG sources:', sources ? sources.length : 'unknown');
+            
             // Create WebGLTile layer with initial RGB visualization
             cogLayer = new WebGLTileLayer({
                 source: cogSource,
@@ -213,6 +217,8 @@ function loadMultiBandCOG(urls) {
 
             map.addLayer(cogLayer);
             console.log('✅ WebGLTile layer added with GPU acceleration');
+            console.log('🎨 Initial style applied - if image is black, try adjusting sliders');
+            console.log('💡 Try moving Red Max slider to 10000 if no image visible');
 
             // Keep map centered on Tucson (don't zoom to COG extent)
             // The COG should cover Tucson if STAC search worked correctly
@@ -234,7 +240,7 @@ function loadMultiBandCOG(urls) {
 }
 
 /**
- * Create RGB visualization style
+ * Create RGB visualization style with wider range
  */
 function createRGBStyle() {
     const redMin = parseInt(document.getElementById('red-min').value);
@@ -242,12 +248,16 @@ function createRGBStyle() {
     const greenMin = parseInt(document.getElementById('green-min').value);
     const greenMax = parseInt(document.getElementById('green-max').value);
 
+    console.log('🎨 Creating RGB style with:', {redMax, greenMax});
+
+    // Start with very simple normalization - just divide by max value
+    // Sentinel-2 L2A surface reflectance: 0-10000 (scaled by 10000)
     return {
         color: [
             'array',
-            ['interpolate', ['linear'], ['band', 1], redMin, 0, redMax, 1],   // Red
-            ['interpolate', ['linear'], ['band', 2], greenMin, 0, greenMax, 1], // Green
-            ['interpolate', ['linear'], ['band', 3], 0, 0, 3000, 1],           // Blue (fixed)
+            ['clamp', ['/', ['band', 1], redMax], 0, 1],     // Red
+            ['clamp', ['/', ['band', 2], greenMax], 0, 1],   // Green  
+            ['clamp', ['/', ['band', 3], 3000], 0, 1],       // Blue
             1
         ]
     };
