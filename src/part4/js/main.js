@@ -201,13 +201,9 @@ function loadMultiBandCOG(urls) {
         // Wait for source to be ready
         cogSource.getView().then((viewConfig) => {
             console.log('✅ COG source ready');
-            console.log('📐 Bands available:', cogSource.getBands ? cogSource.getBands().length : 4);
+            console.log('📐 Bands available:', 4); // We loaded 4 sources
             console.log('📐 COG extent:', viewConfig.extent);
             console.log('📐 COG projection:', viewConfig.projection);
-            
-            // Log source details for debugging
-            const sources = cogSource.getSources();
-            console.log('📊 COG sources:', sources ? sources.length : 'unknown');
             
             // Create WebGLTile layer with initial RGB visualization
             cogLayer = new WebGLTileLayer({
@@ -361,13 +357,14 @@ function loadFallbackCOG() {
     console.log('🔄 Loading fallback COG example...');
     
     try {
-        // Use a simple single-band grayscale example
-        const fallbackUrl = 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/53/H/PA/2021/7/S2A_53HPA_20210723_0_L2A/B04.tif';
+        // Use the Red band from the Tucson scene we already found
+        // This should work since STAC returned valid URLs
+        const fallbackUrl = 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/12/S/VA/2023/12/S2B_12SVA_20231225_0_L2A/B04.tif';
         
         console.log('🔗 Fallback COG:', fallbackUrl);
 
         cogSource = new GeoTIFF({
-            sources: [{ url: fallbackUrl }],
+            sources: [{ url: fallbackUrl, nodata: 0 }],
             crossOrigin: 'anonymous'
         });
 
@@ -388,11 +385,8 @@ function loadFallbackCOG() {
             });
 
             map.addLayer(cogLayer);
-            console.log('✅ Fallback COG loaded (grayscale)');
-            
-            map.getView().fit(viewConfig.extent, {
-                padding: [50, 50, 50, 50]
-            });
+            console.log('✅ Fallback COG loaded (grayscale Red band)');
+            console.log('💡 Showing single Red band as grayscale');
             
         }).catch((error) => {
             console.error('❌ Fallback COG failed to load:', error);
